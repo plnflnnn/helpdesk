@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "verbatimModuleSyntax": false,
+    // Tests also compile shared/ sources.
+    "rootDir": ".."
+  }
+}
