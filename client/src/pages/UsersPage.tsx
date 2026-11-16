@@ -1,9 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckIcon, CopyIcon, UserPlusIcon } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { createAgentInputSchema, type UserListItem } from '@helpdesk/shared';
 import { createAgent, listUsers, setUserActive } from '@/api/users';
 import { useCurrentUser } from '@/auth/useAuth';
+import { FieldError } from '@/components/FieldError';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -139,39 +142,26 @@ function AddAgentDialog({
     mutationFn: createAgent,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: usersQueryKey }),
   });
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const form = useForm({
+    resolver: zodResolver(createAgentInputSchema),
+    defaultValues: { name: '', email: '' },
+  });
+  const { errors } = form.formState;
   const [copied, setCopied] = useState(false);
 
   function handleOpenChange(next: boolean) {
     if (!next) {
       create.reset();
-      setValidationError(null);
+      form.reset();
       setCopied(false);
     }
     onOpenChange(next);
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const parsed = createAgentInputSchema.safeParse({
-      name: form.get('name'),
-      email: form.get('email'),
-    });
-    if (!parsed.success) {
-      setValidationError(parsed.error.issues[0]?.message ?? 'Check the form and try again');
-      return;
-    }
-    setValidationError(null);
-    create.mutate(parsed.data);
   }
 
   async function copyLink(url: string) {
     await navigator.clipboard.writeText(url);
     setCopied(true);
   }
-
-  const error = validationError ?? create.error?.message;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -206,25 +196,44 @@ function AddAgentDialog({
             </DialogFooter>
           </>
         ) : (
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={form.handleSubmit((data) => create.mutate(data))}
+            noValidate
+          >
             <DialogHeader>
               <DialogTitle>Add agent</DialogTitle>
               <DialogDescription>
                 The agent gets an invite link to set their own password.
               </DialogDescription>
             </DialogHeader>
-            {error && (
+            {create.error && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{create.error.message}</AlertDescription>
               </Alert>
             )}
             <div className="flex flex-col gap-2">
               <Label htmlFor="agent-name">Name</Label>
-              <Input id="agent-name" name="name" autoComplete="off" />
+              <Input
+                id="agent-name"
+                autoComplete="off"
+                aria-invalid={errors.name ? true : undefined}
+                aria-describedby={errors.name ? 'agent-name-error' : undefined}
+                {...form.register('name')}
+              />
+              <FieldError id="agent-name-error" error={errors.name} />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="agent-email">Email</Label>
-              <Input id="agent-email" name="email" type="email" autoComplete="off" />
+              <Input
+                id="agent-email"
+                type="email"
+                autoComplete="off"
+                aria-invalid={errors.email ? true : undefined}
+                aria-describedby={errors.email ? 'agent-email-error' : undefined}
+                {...form.register('email')}
+              />
+              <FieldError id="agent-email-error" error={errors.email} />
             </div>
             <DialogFooter>
               <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>

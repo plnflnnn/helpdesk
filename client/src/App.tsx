@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Link, Route, Routes } from 'react-router';
+import { BrowserRouter, Route, Routes } from 'react-router';
+import { Role } from '@helpdesk/shared';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { createQueryClient } from '@/lib/queryClient';
 import { LoginPage } from '@/pages/LoginPage';
+import { NotFoundPage } from '@/pages/NotFoundPage';
 import { SetPasswordPage } from '@/pages/SetPasswordPage';
 import { TicketsPage } from '@/pages/TicketsPage';
 import { UsersPage } from '@/pages/UsersPage';
@@ -25,25 +27,14 @@ export function AppRoutes() {
         <Route
           path="users"
           element={
-            <ProtectedRoute role="admin">
+            <ProtectedRoute role={Role.admin}>
               <UsersPage />
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
-  );
-}
-
-function NotFound() {
-  return (
-    <div className="flex flex-col gap-2">
-      <h1 className="text-2xl font-semibold">Page not found</h1>
-      <Link to="/" className="text-sm text-primary underline-offset-4 hover:underline">
-        Back to tickets
-      </Link>
-    </div>
   );
 }
 
