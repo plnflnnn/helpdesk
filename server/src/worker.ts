@@ -25,11 +25,15 @@ const serverDir = fileURLToPath(
 const knowledgeBase = await loadKnowledgeBase(path.resolve(serverDir, env.KNOWLEDGE_BASE_PATH));
 
 /** Runs one ticket job, logging failures before pg-boss retries them. */
-function ticketHandler(task: string, run: (ticketId: number) => Promise<unknown>) {
+function ticketHandler(
+  task: string,
+  run: (ticketId: number, signal: AbortSignal) => Promise<unknown>,
+) {
   return async ([job]: Job<TicketJob>[]) => {
     const { ticketId } = job!.data;
     try {
-      await run(ticketId);
+      // The signal aborts when the job expires (`expireInSeconds`), before pg-boss retries it.
+      await run(ticketId, job!.signal);
     } catch (error) {
       console.error(`${task} ticket ${ticketId} failed (attempt ${job!.retryCount + 1})`, error);
       throw error;
@@ -41,14 +45,23 @@ if (model) {
   await boss.work<TicketJob>(
     CLASSIFY_TICKET,
     { localConcurrency: 5 },
-    ticketHandler('Classifying', (ticketId) => classifyTicket({ db, model, ticketId })),
+    ticketHandler('Classifying', (ticketId, signal) =>
+      classifyTicket({ db, model, ticketId, signal }),
+    ),
   );
   if (knowledgeBase) {
     await boss.work<TicketJob>(
       AUTO_RESOLVE_TICKET,
       { localConcurrency: 5 },
-      ticketHandler('Auto-resolving', async (ticketId) => {
-        const outcome = await autoResolveTicket({ db, model, mailer, knowledgeBase, ticketId });
+      ticketHandler('Auto-resolving', async (ticketId, signal) => {
+        const outcome = await autoResolveTicket({
+          db,
+          model,
+          mailer,
+          knowledgeBase,
+          ticketId,
+          signal,
+        });
         console.log(`Auto-resolve ticket ${ticketId}: ${outcome}`);
       }),
     );

@@ -32,7 +32,14 @@ export type DashboardStats = z.infer<typeof dashboardStatsSchema>;
 export const dashboardResponseSchema = z.object({ stats: dashboardStatsSchema });
 export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
 
+/**
+ * An IANA zone name such as `Europe/Paris` or `UTC`. Offsets like `+05:30` are rejected: `Intl`
+ * accepts them, but Postgres reads them as POSIX offsets with the sign flipped.
+ */
 function isTimeZone(value: string) {
+  if (!/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+)*$/.test(value)) {
+    return false;
+  }
   try {
     new Intl.DateTimeFormat('en', { timeZone: value });
     return true;

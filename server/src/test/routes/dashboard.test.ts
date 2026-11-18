@@ -13,8 +13,8 @@ type SeedTicket = {
   status?: 'open' | 'pending' | 'resolved' | 'closed';
   createdAt?: Date;
   resolvedAt?: Date | null;
-  /** Who replied: 'ai' (no author), 'agent', or both. */
-  replies?: ('ai' | 'agent')[];
+  /** Who replied: 'ai', 'agent', or 'deletedAgent' (an agent whose user row was deleted). */
+  replies?: ('ai' | 'agent' | 'deletedAgent')[];
 };
 
 let studentCount = 0;
@@ -37,6 +37,7 @@ async function createTicket(
             direction: 'outbound' as const,
             bodyText: 'Answer',
             authorId: from === 'agent' ? agentId : null,
+            sentByAi: from === 'ai',
           })),
         ],
       },
@@ -102,6 +103,19 @@ describe('GET /api/dashboard', () => {
     expect(stats.averageResolutionSeconds).toBeNull();
   });
 
+  it('does not count replies from a deleted agent as the AI’s', async () => {
+    const agent = await ctx.createUser();
+    await createTicket(agent.id, {
+      status: 'resolved',
+      resolvedAt: new Date(),
+      replies: ['deletedAgent'],
+    });
+
+    const { stats } = dashboardResponseSchema.parse((await getStats()).body);
+
+    expect(stats.resolvedByAi).toBe(0);
+  });
+
   it('counts tickets per day for the last 30 days, including empty days', async () => {
     const agent = await ctx.createUser();
     const now = Date.now();
@@ -144,6 +158,10 @@ describe('GET /api/dashboard', () => {
 
   it('rejects an unknown time zone with 400', async () => {
     expect((await getStats('?timeZone=Mars/Olympus')).status).toBe(400);
+  });
+
+  it('rejects a UTC offset with 400, since Postgres would flip its sign', async () => {
+    expect((await getStats(`?timeZone=${encodeURIComponent('+05:30')}`)).status).toBe(400);
   });
 });
 

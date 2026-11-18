@@ -2,6 +2,7 @@ import { generateText, Output, type LanguageModel } from 'ai';
 import { z } from 'zod';
 import { ticketCategorySchema, ticketPrioritySchema } from '@helpdesk/shared';
 import type { Database } from '@/db.js';
+import { HttpError } from '@/errors.js';
 import { formatConversation } from '@/services/ai.js';
 import { getTicket } from '@/services/tickets.js';
 
@@ -32,6 +33,8 @@ type ClassifyTicketParams = {
   db: Database;
   model: LanguageModel;
   ticketId: number;
+  /** Aborts the AI call, e.g. when the job times out. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -40,16 +43,17 @@ type ClassifyTicketParams = {
  *
  * Does nothing for a ticket that no longer exists. Throws when the AI fails, so the job is retried.
  */
-export async function classifyTicket({ db, model, ticketId }: ClassifyTicketParams) {
-  const current = await db.ticket.findUnique({
-    where: { id: ticketId },
-    select: { category: true, priority: true },
-  });
-  if (!current) {
-    return;
+export async function classifyTicket({ db, model, ticketId, signal }: ClassifyTicketParams) {
+  let ticket;
+  try {
+    ticket = await getTicket(db, ticketId);
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) {
+      return;
+    }
+    throw error;
   }
 
-  const ticket = await getTicket(db, ticketId);
   const { output } = await generateText({
     model,
     instructions: INSTRUCTIONS,
@@ -61,13 +65,14 @@ ${formatConversation(ticket)}
     output: Output.object({ schema: classificationSchema }),
     maxRetries: 0, // pg-boss retries the whole job.
     timeout: 30_000,
+    abortSignal: signal,
   });
   const { category } = output;
   const priority = category === 'refund_request' ? 'high' : output.priority;
 
   // Only overwrite the category and priority if they are still what they were before the AI ran.
   await db.ticket.updateMany({
-    where: { id: ticketId, category: current.category, priority: current.priority },
+    where: { id: ticketId, category: ticket.category, priority: ticket.priority },
     data: { category, priority },
   });
 }

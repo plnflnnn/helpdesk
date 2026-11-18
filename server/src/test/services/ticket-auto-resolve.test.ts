@@ -52,8 +52,8 @@ async function createTicket() {
   });
 }
 
-const run = (ticketId: number) =>
-  autoResolveTicket({ db: ctx.db, model, mailer, knowledgeBase: KNOWLEDGE_BASE, ticketId });
+const run = (ticketId: number, signal?: AbortSignal) =>
+  autoResolveTicket({ db: ctx.db, model, mailer, knowledgeBase: KNOWLEDGE_BASE, ticketId, signal });
 
 const findTicket = (id: number) =>
   ctx.db.ticket.findUniqueOrThrow({
@@ -85,9 +85,24 @@ describe('autoResolveTicket', () => {
     expect(ticket.messages.at(-1)).toMatchObject({
       direction: 'outbound',
       authorId: null,
+      sentByAi: true,
       bodyText: ANSWER,
       inReplyTo: '<first@mail.example.com>',
     });
+  });
+
+  it('sends nothing when the job was aborted (timed out) while the AI was running', async () => {
+    const { id } = await createTicket();
+    const controller = new AbortController();
+    doGenerate.mockImplementation(async () => {
+      controller.abort(new Error('Job expired'));
+      return modelReply({ resolvable: true, reply: ANSWER });
+    });
+
+    await expect(run(id, controller.signal)).rejects.toThrow('Job expired');
+
+    expect(send).not.toHaveBeenCalled();
+    expect((await findTicket(id)).status).toBe('open');
   });
 
   it('leaves the ticket to agents when the knowledge base does not answer it', async () => {

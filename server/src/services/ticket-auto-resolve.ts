@@ -47,6 +47,8 @@ type AutoResolveTicketParams = {
   mailer: Mailer;
   knowledgeBase: string;
   ticketId: number;
+  /** Aborts the job, e.g. when it times out: the AI call stops and no email is sent. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -62,6 +64,7 @@ export async function autoResolveTicket({
   mailer,
   knowledgeBase,
   ticketId,
+  signal,
 }: AutoResolveTicketParams): Promise<'resolved' | 'skipped'> {
   if (!(await isUntouched(db, ticketId))) {
     return 'skipped';
@@ -84,6 +87,7 @@ ${formatConversation(ticket)}
     output: Output.object({ schema: decisionSchema }),
     maxRetries: 0, // pg-boss retries the whole job.
     timeout: 60_000,
+    abortSignal: signal,
   });
   const reply = output.reply.trim();
   if (!output.resolvable || !reply) {
@@ -94,6 +98,8 @@ ${formatConversation(ticket)}
   if (!(await isUntouched(db, ticketId))) {
     return 'skipped';
   }
+  // A job that ran past its timeout is retried by pg-boss: sending now could email the student twice.
+  signal?.throwIfAborted();
   const sent = await emailReply({
     db,
     mailer,
@@ -109,7 +115,7 @@ ${formatConversation(ticket)}
       data: {
         status: 'resolved',
         resolvedAt: new Date(),
-        messages: { create: { direction: 'outbound', bodyText: reply, ...sent } },
+        messages: { create: { direction: 'outbound', sentByAi: true, bodyText: reply, ...sent } },
       },
     });
   } catch (error) {

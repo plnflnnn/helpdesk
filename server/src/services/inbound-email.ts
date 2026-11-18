@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { Prisma } from '@generated/prisma/client.js';
 import type { Database } from '@/db.js';
 import type { JobQueue } from '@/jobs/queue.js';
 
@@ -19,7 +21,8 @@ export type InboundEmail = {
   fromName: string | null;
   subject: string;
   bodyText: string;
-  messageId: string | null;
+  /** The `Message-ID` header, or one derived from the email's content when it has none. */
+  messageId: string;
   inReplyTo: string | null;
   /** `References` header: the thread's Message-IDs, oldest first. */
   references: string[];
@@ -34,12 +37,16 @@ export function parseInboundEmail(fields: InboundParseFields): InboundEmail | nu
     return null;
   }
   const headers = parseHeaders(fields.headers ?? '');
+  const subject = fields.subject?.trim() || '(no subject)';
+  const bodyText = (fields.text?.trim() || htmlToText(fields.html ?? '')).trim();
   return {
     fromEmail: sender.email,
     fromName: sender.name,
-    subject: fields.subject?.trim() || '(no subject)',
-    bodyText: (fields.text?.trim() || htmlToText(fields.html ?? '')).trim(),
-    messageId: messageIds(headers.get('message-id'))[0] ?? null,
+    subject,
+    bodyText,
+    messageId:
+      messageIds(headers.get('message-id'))[0] ??
+      fallbackMessageId([sender.email, headers.get('date') ?? '', subject, bodyText]),
     inReplyTo: messageIds(headers.get('in-reply-to'))[0] ?? null,
     references: messageIds(headers.get('references')),
     recipients: [...(fields.to?.split(',') ?? []), ...envelopeRecipients(fields.envelope)]
@@ -65,23 +72,37 @@ export type ReceiveEmailResult =
  * for the AI.
  *
  * A reply reopens a pending or resolved ticket; a reply to a closed ticket starts a new one.
- * An email that was already received (same Message-ID, e.g. a webhook retry) is ignored.
+ * An email that was already received (same Message-ID, e.g. a webhook retry) is ignored, including
+ * when two deliveries of it arrive at the same time.
  */
 export async function receiveEmail({
   db,
   jobs,
   email,
 }: ReceiveEmailParams): Promise<ReceiveEmailResult> {
-  if (email.messageId) {
-    const existing = await db.message.findUnique({
-      where: { emailMessageId: email.messageId },
-      select: { id: true },
-    });
-    if (existing) {
+  const existing = await db.message.findUnique({
+    where: { emailMessageId: email.messageId },
+    select: { id: true },
+  });
+  if (existing) {
+    return { outcome: 'duplicate' };
+  }
+  try {
+    return await saveEmail(db, jobs, email);
+  } catch (error) {
+    // A concurrent delivery of the same email saved its message first.
+    if (isDuplicateMessageId(error)) {
       return { outcome: 'duplicate' };
     }
+    throw error;
   }
+}
 
+async function saveEmail(
+  db: Database,
+  jobs: JobQueue,
+  email: InboundEmail,
+): Promise<ReceiveEmailResult> {
   const message = {
     direction: 'inbound',
     bodyText: email.bodyText,
@@ -98,11 +119,7 @@ export async function receiveEmail({
     return { outcome: 'threaded', ticketId: thread.id };
   }
 
-  const student = await db.student.upsert({
-    where: { email: email.fromEmail },
-    create: { email: email.fromEmail, name: email.fromName },
-    update: {},
-  });
+  const student = await upsertStudent(db, email);
   if (!student.name && email.fromName) {
     await db.student.update({ where: { id: student.id }, data: { name: email.fromName } });
   }
@@ -126,8 +143,43 @@ export async function receiveEmail({
 }
 
 /**
+ * Prisma's upsert reads, then inserts, so two emails from a new student arriving together can both
+ * try to insert: the loser retries once and finds the winner's row.
+ */
+async function upsertStudent(db: Database, email: InboundEmail) {
+  const upsert = () =>
+    db.student.upsert({
+      where: { email: email.fromEmail },
+      create: { email: email.fromEmail, name: email.fromName },
+      update: {},
+    });
+  try {
+    return await upsert();
+  } catch (error) {
+    if (isUniqueViolation(error, 'email')) {
+      return upsert();
+    }
+    throw error;
+  }
+}
+
+function isDuplicateMessageId(error: unknown) {
+  return isUniqueViolation(error, 'emailMessageId');
+}
+
+/** A unique-constraint error naming `field` (Prisma reports the constraint in `meta`). */
+function isUniqueViolation(error: unknown, field: string) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002' &&
+    JSON.stringify(error.meta ?? {}).includes(field)
+  );
+}
+
+/**
  * The ticket this email replies to: found by its `In-Reply-To` / `References` headers, or else by
- * a `support+T<id>@` recipient address, as long as the sender is that ticket's student.
+ * a `support+T<id>@` recipient address. Either way the sender must be that ticket's student, so
+ * a CC'd or forwarded recipient's reply starts a ticket of their own.
  */
 async function findThread(db: Database, email: InboundEmail) {
   const select = { id: true, status: true, student: { select: { email: true } } } as const;
@@ -144,7 +196,7 @@ async function findThread(db: Database, email: InboundEmail) {
     for (const id of referencedIds) {
       const match = messages.find((message) => message.emailMessageId === id);
       if (match) {
-        return match.ticket;
+        return match.ticket.student.email === email.fromEmail ? match.ticket : null;
       }
     }
   }
@@ -190,6 +242,15 @@ function parseHeaders(raw: string) {
     }
   }
   return headers;
+}
+
+/**
+ * A stable Message-ID for an email that has none, so retries of the same webhook are still
+ * recognised as duplicates. The `Date` header keeps a genuinely re-sent email apart.
+ */
+function fallbackMessageId(parts: string[]) {
+  const hash = createHash('sha256').update(parts.join('\0')).digest('hex');
+  return `<${hash}@inbound.invalid>`;
 }
 
 /** Every `<...>` Message-ID in a header value, in order. */

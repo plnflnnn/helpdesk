@@ -18,6 +18,7 @@ type EmailOptions = {
   to?: string;
   subject?: string;
   text?: string;
+  /** `''` sends no Message-ID header. */
   messageId?: string;
   inReplyTo?: string;
   references?: string;
@@ -40,7 +41,7 @@ function postEmail(
     `From: ${from}`,
     `To: ${to}`,
     `Subject: ${subject}`,
-    `Message-ID: ${messageId}`,
+    messageId && `Message-ID: ${messageId}`,
     inReplyTo && `In-Reply-To: ${inReplyTo}`,
     // Long headers are folded onto several lines.
     references && `References: ${references.split(' ').join('\r\n ')}`,
@@ -117,6 +118,27 @@ describe('POST /webhooks/inbound', () => {
     expect(classifyTicket).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores a duplicate that arrives while the first delivery is still being saved', async () => {
+    const responses = await Promise.all([postEmail(), postEmail()]);
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect(responses.map((response) => response.body.outcome).sort()).toEqual([
+      'created',
+      'duplicate',
+    ]);
+    expect(await ctx.db.message.count()).toBe(1);
+  });
+
+  it('ignores a retry of an email that has no Message-ID', async () => {
+    await postEmail({ messageId: '' });
+
+    const response = await postEmail({ messageId: '' });
+
+    expect(response.body).toEqual({ outcome: 'duplicate' });
+    expect(await ctx.db.ticket.count()).toBe(1);
+    expect(classifyTicket).toHaveBeenCalledTimes(1);
+  });
+
   it('threads a reply onto its ticket by References and reopens it, without new AI jobs', async () => {
     await postEmail();
     const { id } = await onlyTicket();
@@ -176,6 +198,24 @@ describe('POST /webhooks/inbound', () => {
     });
 
     expect(response.body).toEqual({ outcome: 'created', ticketId: id + 1 });
+  });
+
+  it('does not thread by headers when the sender is not the ticket’s student', async () => {
+    await postEmail();
+    const { id } = await onlyTicket();
+
+    const response = await postEmail({
+      from: 'someone@else.com',
+      messageId: '<other@mail.example.com>',
+      inReplyTo: '<first@mail.example.com>',
+    });
+
+    expect(response.body).toEqual({ outcome: 'created', ticketId: id + 1 });
+    const original = await ctx.db.ticket.findUniqueOrThrow({
+      where: { id },
+      include: { messages: true },
+    });
+    expect(original.messages).toHaveLength(1);
   });
 
   it('starts a new ticket when the student replies to a closed one', async () => {

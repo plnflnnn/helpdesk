@@ -180,6 +180,9 @@ model Message {
   /// The agent who sent an outbound message; null for student messages.
   authorId       String?
   author         User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  /// True for replies the AI wrote and sent. Kept apart from `authorId`, which also becomes null
+  /// when an agent's user row is deleted.
+  sentByAi       Boolean          @default(false)
   bodyText       String
   /// Email `Message-ID` header, used to thread replies.
   emailMessageId String?          @unique
