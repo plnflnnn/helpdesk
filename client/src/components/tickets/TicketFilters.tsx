@@ -53,9 +53,13 @@ export function TicketFilters({ search = '', status, category, onChange }: Ticke
     if (searchText.trim() === search) {
       return;
     }
-    const timeout = setTimeout(() => onChange({
-      search: searchText.trim()
-    }), SEARCH_DELAY_MS);
+    const timeout = setTimeout(
+      () =>
+        onChange({
+          search: searchText.trim(),
+        }),
+      SEARCH_DELAY_MS,
+    );
     return () => clearTimeout(timeout);
   }, [searchText, search, onChange]);
 

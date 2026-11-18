@@ -2,6 +2,7 @@ import axios from 'axios';
 import {
   listAssigneesResponseSchema,
   listTicketsResponseSchema,
+  polishReplyResponseSchema,
   ticketResponseSchema,
   type ListTicketsQueryInput,
   type ReplyInput,
@@ -32,6 +33,12 @@ export async function updateTicket(id: number, input: UpdateTicketInput) {
 export async function addReply(id: number, input: ReplyInput) {
   const { data } = await axios.post(`/api/tickets/${id}/replies`, input);
   return ticketResponseSchema.parse(data).ticket;
+}
+
+/** Asks the AI to improve a draft reply; returns the polished text without saving it. */
+export async function polishReply(id: number, input: ReplyInput) {
+  const { data } = await axios.post(`/api/tickets/${id}/replies/polish`, input);
+  return polishReplyResponseSchema.parse(data).bodyText;
 }
 
 /** Everyone a ticket can be assigned to. */

@@ -6,6 +6,7 @@ import {
   updateTicketInputSchema,
   type ListAssigneesResponse,
   type ListTicketsResponse,
+  type PolishReplyResponse,
   type TicketResponse,
 } from '@helpdesk/shared';
 import { requireAuth } from '@/middleware/auth.js';
@@ -17,10 +18,11 @@ import {
   listTickets,
   updateTicket,
 } from '@/services/tickets.js';
+import { polishReply } from '@/services/reply-polish.js';
 import type { Services } from '@/types.js';
 
 /** Tickets, available to every signed-in agent and admin. */
-export function ticketsRouter({ db, auth }: Services) {
+export function ticketsRouter({ db, auth, replyModel }: Services) {
   const router = Router();
   router.use(requireAuth(auth));
 
@@ -62,6 +64,23 @@ export function ticketsRouter({ db, auth }: Services) {
       });
       const body: TicketResponse = { ticket };
       res.status(201).json(body);
+    },
+  );
+
+  // Returns an improved version of the agent's draft; nothing is saved.
+  router.post(
+    '/:id/replies/polish',
+    validate({ params: ticketIdParamsSchema, body: replyInputSchema }),
+    async (req, res) => {
+      const bodyText = await polishReply({
+        db,
+        model: replyModel,
+        ticketId: req.params.id,
+        agentName: req.user!.name,
+        draft: req.body.bodyText,
+      });
+      const body: PolishReplyResponse = { bodyText };
+      res.json(body);
     },
   );
 

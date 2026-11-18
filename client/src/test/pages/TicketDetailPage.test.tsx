@@ -62,6 +62,12 @@ function mockTicketApi({ failWith = 0 } = {}) {
       current = { ...current, status: 'pending', messages: [...current.messages, reply] };
       return { status: 201, body: { ticket: current } };
     },
+    'POST /api/tickets/7/replies/polish': (body) => {
+      if (failWith) {
+        return { status: 502, body: { error: 'The AI service could not polish the reply' } };
+      }
+      return { status: 200, body: { bodyText: `Polished: ${(body as ReplyInput).bodyText}` } };
+    },
     'PATCH /api/tickets/7': (body) => {
       if (failWith) {
         return { status: failWith, body: { error: 'This agent does not exist or is inactive' } };
@@ -193,6 +199,50 @@ describe('ticket detail page', () => {
 
     expect(
       await screen.findByText('Could not send the reply: Something went wrong'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Reply')).toHaveValue('Hello');
+  });
+
+  it('polishes the draft in place without sending it', async () => {
+    const api = mockTicketApi();
+    renderApp('/tickets/7');
+    await screen.findByRole('heading', { name: ticket.subject });
+
+    fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'resent email' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Polish' }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Reply')).toHaveValue('Polished: resent email'),
+    );
+    expect(requestBody(api, '/api/tickets/7/replies/polish', 'POST')).toEqual({
+      bodyText: 'resent email',
+    });
+    expect(requestBody(api, '/api/tickets/7/replies', 'POST')).toBeUndefined();
+  });
+
+  it('does not polish an empty draft', async () => {
+    const api = mockTicketApi();
+    renderApp('/tickets/7');
+    await screen.findByRole('heading', { name: ticket.subject });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Polish' }));
+
+    expect(await screen.findByText('Write a reply')).toBeInTheDocument();
+    expect(requestBody(api, '/api/tickets/7/replies/polish', 'POST')).toBeUndefined();
+  });
+
+  it('keeps the draft when polishing fails', async () => {
+    mockTicketApi({ failWith: 500 });
+    renderApp('/tickets/7');
+    await screen.findByRole('heading', { name: ticket.subject });
+
+    fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Polish' }));
+
+    expect(
+      await screen.findByText(
+        'Could not polish the reply: The AI service could not polish the reply',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Reply')).toHaveValue('Hello');
   });

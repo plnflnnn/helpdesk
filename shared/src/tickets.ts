@@ -168,6 +168,10 @@ export const replyInputSchema = z.object({
 });
 export type ReplyInput = z.infer<typeof replyInputSchema>;
 
+/** Response of `POST /api/tickets/:id/replies/polish` (the body is a `ReplyInput` draft). */
+export const polishReplyResponseSchema = z.object({ bodyText: z.string() });
+export type PolishReplyResponse = z.infer<typeof polishReplyResponseSchema>;
+
 // Assignees.
 
 /** Someone a ticket can be assigned to: any active user (agents and admins). */

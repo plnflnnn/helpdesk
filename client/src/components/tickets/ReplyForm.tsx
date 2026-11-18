@@ -1,8 +1,9 @@
+import { SparklesIcon } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { REPLY_MAX_LENGTH, replyInputSchema, type ReplyInput } from '@helpdesk/shared';
-import { addReply, ticketQueryKey, ticketsQueryKey } from '@/api/tickets';
+import { addReply, polishReply, ticketQueryKey, ticketsQueryKey } from '@/api/tickets';
 import { FieldError } from '@/components/FieldError';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,14 @@ export function ReplyForm({ ticketId }: { ticketId: number }) {
       await queryClient.invalidateQueries({ queryKey: ticketsQueryKey });
     },
   });
+  const polish = useMutation({
+    mutationFn: (input: ReplyInput) => polishReply(ticketId, input),
+    onSuccess: (bodyText) => {
+      form.setValue('bodyText', bodyText, { shouldDirty: true, shouldValidate: true });
+    },
+  });
   const error = form.formState.errors.bodyText;
+  const busy = send.isPending || polish.isPending;
 
   return (
     <form
@@ -34,6 +42,13 @@ export function ReplyForm({ ticketId }: { ticketId: number }) {
       noValidate
     >
       <Label htmlFor="reply-body">Reply</Label>
+      {polish.error && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Could not polish the reply: {errorMessage(polish.error)}
+          </AlertDescription>
+        </Alert>
+      )}
       {send.error && (
         <Alert variant="destructive">
           <AlertDescription>Could not send the reply: {errorMessage(send.error)}</AlertDescription>
@@ -44,14 +59,26 @@ export function ReplyForm({ ticketId }: { ticketId: number }) {
         rows={5}
         placeholder="Write your reply to the student…"
         maxLength={REPLY_MAX_LENGTH}
-        readOnly={send.isPending}
+        readOnly={busy}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? 'reply-body-error' : undefined}
         {...form.register('bodyText')}
       />
       <FieldError id="reply-body-error" error={error} />
-      <div className="flex justify-end">
-        <Button type="submit" disabled={send.isPending}>
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={form.handleSubmit((data) => {
+            send.reset();
+            polish.mutate(data);
+          })}
+        >
+          <SparklesIcon aria-hidden />
+          {polish.isPending ? 'Polishing…' : 'Polish'}
+        </Button>
+        <Button type="submit" disabled={busy}>
           {send.isPending ? 'Sending…' : 'Send reply'}
         </Button>
       </div>

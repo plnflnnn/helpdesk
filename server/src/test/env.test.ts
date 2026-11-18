@@ -14,6 +14,7 @@ describe('parseEnv', () => {
       NODE_ENV: 'development',
       PORT: 4000,
       APP_URL: 'http://localhost:3000',
+      OPENAI_MODEL: 'gpt-5.4-mini',
       ...required,
     });
   });

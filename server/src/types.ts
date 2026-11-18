@@ -1,3 +1,4 @@
+import type { LanguageModel } from 'ai';
 import type { Role } from '@helpdesk/shared';
 import type { Auth } from '@/auth.js';
 import type { Database } from '@/db.js';
@@ -7,6 +8,8 @@ import type { Env } from '@/env.js';
 export type Services = {
   db: Database;
   auth: Auth;
+  /** Model that polishes agent replies; unset when no OpenAI key is configured. */
+  replyModel?: LanguageModel;
 };
 
 export type AppDependencies = {

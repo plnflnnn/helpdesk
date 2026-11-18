@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import type { LanguageModel } from 'ai';
 import { hashPassword } from 'better-auth/crypto';
 import { Role } from '@helpdesk/shared';
 import { createApp } from '@/app.js';
@@ -16,8 +17,13 @@ type CreateTestUserOptions = {
   email?: string;
 };
 
+type TestContextOptions = {
+  /** Model for reply polishing; use a `MockLanguageModelV4` from `ai/test`. */
+  replyModel?: LanguageModel;
+};
+
 /** A real app wired to the test database. Call `reset()` before each test and `close()` after all. */
-export function createTestContext() {
+export function createTestContext({ replyModel }: TestContextOptions = {}) {
   const db = createPrismaClient(testDatabaseUrl());
   const auth = createAuth(db, {
     NODE_ENV: 'test',
@@ -27,7 +33,7 @@ export function createTestContext() {
   });
   const app = createApp({
     checkDatabase: async () => true,
-    services: { db, auth },
+    services: { db, auth, replyModel },
   });
 
   async function reset() {

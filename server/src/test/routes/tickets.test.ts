@@ -1,3 +1,5 @@
+import { jest } from '@jest/globals';
+import { MockLanguageModelV4 } from 'ai/test';
 import {
   listAssigneesResponseSchema,
   listTicketsResponseSchema,
@@ -7,9 +9,28 @@ import {
 } from '@helpdesk/shared';
 import { createTestContext } from '@/test/context.js';
 
-const ctx = createTestContext();
+type GenerateResult = Awaited<ReturnType<MockLanguageModelV4['doGenerate']>>;
 
-beforeEach(() => ctx.reset());
+/** A model reply with the given text, in the shape the AI SDK expects. */
+const modelReply = (text: string): GenerateResult => ({
+  content: [{ type: 'text', text }],
+  finishReason: { unified: 'stop', raw: 'stop' },
+  usage: {
+    inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
+    outputTokens: { total: 5, text: 5, reasoning: 0 },
+  },
+  warnings: [],
+});
+
+const doGenerate = jest.fn<MockLanguageModelV4['doGenerate']>();
+const replyModel = new MockLanguageModelV4({ doGenerate });
+const ctx = createTestContext({ replyModel });
+
+beforeEach(async () => {
+  doGenerate.mockReset();
+  replyModel.doGenerateCalls.length = 0;
+  await ctx.reset();
+});
 afterAll(() => ctx.close());
 
 /** Three tickets with different values in every sortable column. */
@@ -450,5 +471,100 @@ describe('POST /api/tickets/:id/replies', () => {
 
     expect(response.status).toBe(400);
     expect(await ctx.db.message.count({ where: { ticketId: ticket.id } })).toBe(2);
+  });
+});
+
+describe('POST /api/tickets/:id/replies/polish', () => {
+  it('rejects unauthenticated requests with 401', async () => {
+    const response = await ctx
+      .client()
+      .post('/api/tickets/1/replies/polish')
+      .send({ bodyText: 'Hi' });
+
+    expect(response.status).toBe(401);
+    expect(doGenerate).not.toHaveBeenCalled();
+  });
+
+  it('returns the polished draft, greeting the customer and signed by the agent, without saving anything', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+    doGenerate.mockResolvedValue(modelReply('  I have resent the email.  '));
+
+    const response = await client
+      .post(`/api/tickets/${ticket.id}/replies/polish`)
+      .send({ bodyText: 'resent email' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      bodyText: 'Hi Mia,\n\nI have resent the email.\n\nBest regards,\nAlan from HelpDesk Support',
+    });
+    expect(await ctx.db.message.count({ where: { ticketId: ticket.id } })).toBe(2);
+  });
+
+  it.each([
+    ['Mia Rose Wong', 'Hi Mia,'],
+    [null, 'Hi there,'],
+  ])('greets a customer named %s with "%s"', async (name, greeting) => {
+    const { ticket } = await seedConversation();
+    await ctx.db.student.updateMany({ data: { name } });
+    const client = await signedInAgent();
+    doGenerate.mockResolvedValue(modelReply('Done.'));
+
+    const response = await client
+      .post(`/api/tickets/${ticket.id}/replies/polish`)
+      .send({ bodyText: 'done' });
+
+    expect(response.body.bodyText).toMatch(new RegExp(`^${greeting}\\n`));
+  });
+
+  it('gives the model the draft, the conversation and the agent name', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+    doGenerate.mockResolvedValue(modelReply('Polished'));
+
+    await client
+      .post(`/api/tickets/${ticket.id}/replies/polish`)
+      .send({ bodyText: 'resent email' });
+
+    const prompt = JSON.stringify(doGenerate.mock.calls[0]![0].prompt);
+    expect(prompt).toContain('resent email');
+    expect(prompt).toContain('The password reset email never arrived.');
+    expect(prompt).toContain('Cannot log in');
+    expect(prompt).toContain('Alan Agent');
+  });
+
+  it('responds 502 when the model fails', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+    doGenerate.mockRejectedValue(new Error('upstream down'));
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await client
+      .post(`/api/tickets/${ticket.id}/replies/polish`)
+      .send({ bodyText: 'resent email' });
+
+    consoleError.mockRestore();
+    expect(response.status).toBe(502);
+  });
+
+  it('responds 404 for a ticket that does not exist', async () => {
+    const client = await signedInAgent();
+
+    const response = await client.post('/api/tickets/999/replies/polish').send({ bodyText: 'Hi' });
+
+    expect(response.status).toBe(404);
+    expect(doGenerate).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty draft with 400', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+
+    const response = await client
+      .post(`/api/tickets/${ticket.id}/replies/polish`)
+      .send({ bodyText: '   ' });
+
+    expect(response.status).toBe(400);
+    expect(doGenerate).not.toHaveBeenCalled();
   });
 });
