@@ -1,6 +1,33 @@
 # Helpdesk
 
-AI-powered support ticket system. See [project-scope.md](project-scope.md), [tech-stack.md](tech-stack.md), and [implementation-plan.md](implementation-plan.md).
+An AI-powered support ticket system for an online course platform. Student emails become tickets that the AI classifies and summarizes. When the knowledge base fully answers a question, the AI replies on its own; everything else goes to agents, who answer from a dashboard.
+
+## Tools and frameworks
+
+**Frontend**
+
+- React 19 + TypeScript, bundled with webpack
+- Tailwind CSS 4, shadcn/ui (Base UI), lucide-react icons
+- TanStack Query (data fetching) and TanStack Table (ticket list)
+- React Router, React Hook Form, Axios
+- Recharts (dashboard charts)
+
+**Backend**
+
+- Node.js 24 + Express 5 + TypeScript
+- PostgreSQL 17 + Prisma 7 (ORM and migrations)
+- Better Auth (database sessions, admin/agent roles)
+- pg-boss (Postgres-backed background job queue, run by a separate worker process)
+- Vercel AI SDK + OpenAI (classification, summaries, auto-replies, reply polishing)
+- SendGrid (Inbound Parse webhook for incoming email, Mail Send for replies)
+- Multer (email attachments)
+
+**Shared and tooling**
+
+- Zod schemas shared by client and server (npm workspaces)
+- Sentry error reporting (server, worker and client)
+- Jest, React Testing Library, Supertest, Playwright
+- ESLint, Prettier
 
 ## Requirements
 
@@ -26,21 +53,41 @@ npm install
 # 4. Configure environment
 cp server/.env.example server/.env   # then set USER in DATABASE_URL / TEST_DATABASE_URL, and ADMIN_*
 
-# 5. Apply migrations and create the first admin (from ADMIN_EMAIL / ADMIN_PASSWORD)
+# 5. Apply migrations, create the admin and the demo data
 npm run db:migrate
 npm run db:seed
+npm run db:seed:replies   # optional: conversation history on resolved tickets
 
 # 6. Browser for end-to-end tests
 npx playwright install chromium
 ```
 
+Then run `npm run dev` and open http://localhost:3000.
+
+## Demo accounts
+
+Outside production, `npm run db:seed` creates 100 demo tickets and four demo agents:
+
+| Role  | Email                         | Password                           |
+| ----- | ----------------------------- | ---------------------------------- |
+| Admin | `ADMIN_EMAIL` from `.env`     | `ADMIN_PASSWORD` from `.env`       |
+| Agent | `sarah.chen@helpdesk.test`    | `demo-agent-password`              |
+| Agent | `marcus.johnson@helpdesk.test` | `demo-agent-password`             |
+| Agent | `priya.patel@helpdesk.test`   | `demo-agent-password`              |
+| Agent | `diego.alvarez@helpdesk.test` | `demo-agent-password`              |
+
+Set `DEMO_AGENT_PASSWORD` in `.env` to use a different agent password.
+
+Without `SENDGRID_API_KEY`, outgoing emails are printed to the server console instead of being sent. Without `OPENAI_API_KEY`, the AI features are turned off.
+
 ## Scripts
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Client on http://localhost:3000, API on http://localhost:4000 (client proxies `/api`) |
+| `npm run dev` | Client on http://localhost:3000, API on http://localhost:4000 (client proxies `/api`), and the job worker |
 | `npm run build` | Build shared, server, and client |
 | `npm start` | Run the built server (serves the built client when `NODE_ENV=production`) |
+| `npm run start:worker` | Run the built background job worker |
 | `npm test` | Jest tests for server and client (server tests use `TEST_DATABASE_URL`, wiped between tests) |
 | `npm run test:e2e` | Playwright end-to-end tests (starts dev servers automatically) |
 | `npm run typecheck` | TypeScript checks for all packages |
@@ -48,17 +95,22 @@ npx playwright install chromium
 | `npm run format` | Prettier |
 | `npm run db:migrate` | Create/apply Prisma migrations |
 | `npm run db:generate` | Regenerate the Prisma client |
-| `npm run db:seed` | Create the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` (safe to re-run) |
+| `npm run db:seed` | Create the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`, plus demo agents and tickets outside production (safe to re-run) |
+| `npm run db:seed:replies` | Add demo conversations to resolved tickets (safe to re-run) |
 
 ## Project structure
 
 ```
 client/   React app (webpack, Tailwind CSS, shadcn/ui)
-server/   Express API, Prisma schema and migrations
+server/   Express API, job worker, Prisma schema and migrations, knowledge base
 shared/   Zod schemas and types used by client and server
 e2e/      Playwright tests
 ```
 
-## Users and invites
+## Users
 
-Public sign-up is disabled. The seed script creates the first admin; admins add agents on the **Users** page. Each new agent gets a one-time invite link (valid 7 days) to set their password. Until outbound email is added in Phase 2, the link is shown to the admin and logged by the server.
+Public sign-up is disabled. The seed script creates the first admin, and admins add agents on the **Users** page.
+
+## More docs
+
+[project-scope.md](project-scope.md), [tech-stack.md](tech-stack.md), [implementation-plan.md](implementation-plan.md)
