@@ -4,6 +4,7 @@ import { isAxiosError } from 'axios';
 import { Link, useParams } from 'react-router';
 import { ticketIdParamsSchema, type TicketDetail, type TicketMessage } from '@helpdesk/shared';
 import { getTicket, ticketQueryKey } from '@/api/tickets';
+import { ReplyForm } from '@/components/tickets/ReplyForm';
 import { StatusBadge } from '@/components/tickets/TicketBadges';
 import { TicketFieldsPanel } from '@/components/tickets/TicketFieldsPanel';
 import { cn } from '@/lib/utils';
@@ -63,6 +64,9 @@ export function TicketDetailPage() {
 
 function TicketView({ ticket }: { ticket: TicketDetail }) {
   const { student } = ticket;
+  const studentName = student.name ?? student.email;
+  // The first message is the student's original email; everything after it is the reply thread.
+  const [originalMessage, ...replies] = ticket.messages;
   return (
     <div className="flex flex-col gap-6">
       <BackLink />
@@ -78,19 +82,29 @@ function TicketView({ ticket }: { ticket: TicketDetail }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <section aria-label="Conversation" className="flex flex-col gap-4">
-          {ticket.messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No messages yet.</p>
-          ) : (
-            ticket.messages.map((message) => (
-              <MessageCard
-                key={message.id}
-                message={message}
-                studentName={student.name ?? student.email}
-              />
-            ))
-          )}
-        </section>
+        <div className="flex flex-col gap-6">
+          <section aria-label="Message">
+            {originalMessage ? (
+              <MessageCard message={originalMessage} studentName={studentName} />
+            ) : (
+              <p className="text-sm text-muted-foreground">No message.</p>
+            )}
+          </section>
+
+          <section aria-labelledby="replies-heading" className="flex flex-col gap-4">
+            <h2 id="replies-heading" className="text-lg font-semibold">
+              Replies ({replies.length})
+            </h2>
+            {replies.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No replies yet.</p>
+            ) : (
+              replies.map((reply) => (
+                <MessageCard key={reply.id} message={reply} studentName={studentName} />
+              ))
+            )}
+            <ReplyForm ticketId={ticket.id} />
+          </section>
+        </div>
 
         <aside
           aria-label="Ticket details"

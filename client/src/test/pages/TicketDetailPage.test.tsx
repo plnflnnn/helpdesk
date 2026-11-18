@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import type { TicketDetail, UpdateTicketInput } from '@helpdesk/shared';
+import type { ReplyInput, TicketDetail, UpdateTicketInput } from '@helpdesk/shared';
 import { adminUser, agentUser, mockApi, requestBody, restoreApi } from '@/test/fakeApi';
 import { renderApp } from '@/test/render';
 
@@ -33,8 +33,11 @@ const ticket: TicketDetail = {
   ],
 };
 
-/** Serves the ticket and applies PATCHes to it, like the server would. */
-function mockTicketApi({ patchStatus = 200 } = {}) {
+/**
+ * Serves the ticket and applies updates and replies to it, like the server would.
+ * `failWith` makes updates and replies fail with that status instead.
+ */
+function mockTicketApi({ failWith = 0 } = {}) {
   let current = ticket;
   const assignees = [
     { id: adminUser.id, name: adminUser.name },
@@ -45,9 +48,23 @@ function mockTicketApi({ patchStatus = 200 } = {}) {
     'GET /api/tickets': () => ({ status: 200, body: { tickets: [current] } }),
     'GET /api/tickets/7': () => ({ status: 200, body: { ticket: current } }),
     'GET /api/tickets/assignees': () => ({ status: 200, body: { assignees } }),
+    'POST /api/tickets/7/replies': (body) => {
+      if (failWith) {
+        return { status: failWith, body: { error: 'Something went wrong' } };
+      }
+      const reply = {
+        id: `m${current.messages.length + 1}`,
+        direction: 'outbound' as const,
+        author: { id: agentUser.id, name: agentUser.name },
+        bodyText: (body as ReplyInput).bodyText,
+        createdAt: '2026-11-02T09:00:00.000Z',
+      };
+      current = { ...current, status: 'pending', messages: [...current.messages, reply] };
+      return { status: 201, body: { ticket: current } };
+    },
     'PATCH /api/tickets/7': (body) => {
-      if (patchStatus !== 200) {
-        return { status: patchStatus, body: { error: 'This agent does not exist or is inactive' } };
+      if (failWith) {
+        return { status: failWith, body: { error: 'This agent does not exist or is inactive' } };
       }
       const { assigneeId, ...fields } = body as UpdateTicketInput;
       current = { ...current, ...fields };
@@ -85,13 +102,15 @@ describe('ticket detail page', () => {
 
     expect(await screen.findByRole('heading', { name: ticket.subject })).toBeInTheDocument();
     expect(screen.getByText(/#7 · Emma Thompson <emma@example.com>/)).toBeInTheDocument();
-    const conversation = screen.getByRole('region', { name: 'Conversation' });
-    const messages = within(conversation).getAllByRole('article');
-    expect(messages).toHaveLength(2);
-    expect(messages[0]).toHaveTextContent('Emma Thompson');
-    expect(messages[0]).toHaveTextContent('The reset email never arrived.');
-    expect(messages[1]).toHaveTextContent(agentUser.name);
-    expect(messages[1]).toHaveTextContent('I have sent it again.');
+    const original = within(screen.getByRole('region', { name: 'Message' })).getByRole('article');
+    expect(original).toHaveTextContent('Emma Thompson');
+    expect(original).toHaveTextContent('The reset email never arrived.');
+    const replies = within(screen.getByRole('region', { name: 'Replies (1)' })).getAllByRole(
+      'article',
+    );
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toHaveTextContent(agentUser.name);
+    expect(replies[0]).toHaveTextContent('I have sent it again.');
     expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent('Open');
     expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent(
       'Technical Question',
@@ -119,7 +138,7 @@ describe('ticket detail page', () => {
   });
 
   it('shows the server error when an update fails', async () => {
-    mockTicketApi({ patchStatus: 400 });
+    mockTicketApi({ failWith: 400 });
     renderApp('/tickets/7');
     await screen.findByRole('heading', { name: ticket.subject });
 
@@ -129,6 +148,53 @@ describe('ticket detail page', () => {
       await screen.findByText('Could not save: This agent does not exist or is inactive'),
     ).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Assignee' })).toHaveTextContent('Unassigned');
+  });
+
+  it('sends a reply, adds it to the thread and sets the ticket to pending', async () => {
+    const api = mockTicketApi();
+    renderApp('/tickets/7');
+    await screen.findByRole('heading', { name: ticket.subject });
+
+    fireEvent.change(screen.getByLabelText('Reply'), {
+      target: { value: 'Please try signing in again.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send reply' }));
+
+    const replies = await screen.findByRole('region', { name: 'Replies (2)' });
+    expect(within(replies).getAllByRole('article')[1]).toHaveTextContent(
+      'Please try signing in again.',
+    );
+    expect(requestBody(api, '/api/tickets/7/replies', 'POST')).toEqual({
+      bodyText: 'Please try signing in again.',
+    });
+    expect(screen.getByLabelText('Reply')).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent('Pending');
+  });
+
+  it('does not send an empty reply', async () => {
+    const api = mockTicketApi();
+    renderApp('/tickets/7');
+    await screen.findByRole('heading', { name: ticket.subject });
+
+    fireEvent.change(screen.getByLabelText('Reply'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send reply' }));
+
+    expect(await screen.findByText('Write a reply')).toBeInTheDocument();
+    expect(requestBody(api, '/api/tickets/7/replies', 'POST')).toBeUndefined();
+  });
+
+  it('keeps the typed reply when sending fails', async () => {
+    mockTicketApi({ failWith: 500 });
+    renderApp('/tickets/7');
+    await screen.findByRole('heading', { name: ticket.subject });
+
+    fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send reply' }));
+
+    expect(
+      await screen.findByText('Could not send the reply: Something went wrong'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Reply')).toHaveValue('Hello');
   });
 
   it('says so when the ticket does not exist', async () => {

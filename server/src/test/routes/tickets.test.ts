@@ -376,3 +376,53 @@ describe('GET /api/tickets/assignees', () => {
     expect(assignees.map((a) => a.id)).not.toContain(inactive.id);
   });
 });
+
+describe('POST /api/tickets/:id/replies', () => {
+  it('rejects unauthenticated requests with 401', async () => {
+    const response = await ctx.client().post('/api/tickets/1/replies').send({ bodyText: 'Hi' });
+
+    expect(response.status).toBe(401);
+  });
+
+  it('adds the reply at the end of the conversation, signed by the agent, and sets the ticket to pending', async () => {
+    const { ticket } = await seedConversation();
+    const replier = await ctx.createUser();
+    const client = await ctx.loginAs(replier.email);
+
+    const response = await client
+      .post(`/api/tickets/${ticket.id}/replies`)
+      .send({ bodyText: '  Try signing in again now.  ' });
+
+    expect(response.status).toBe(201);
+    const body = ticketResponseSchema.parse(response.body);
+    expect(body.ticket.status).toBe('pending');
+    expect(body.ticket.messages).toHaveLength(3);
+    expect(body.ticket.messages.at(-1)).toMatchObject({
+      direction: 'outbound',
+      author: { id: replier.id, name: replier.name },
+      bodyText: 'Try signing in again now.',
+    });
+  });
+
+  it('responds 404 for a ticket that does not exist', async () => {
+    const client = await signedInAgent();
+
+    const response = await client.post('/api/tickets/999/replies').send({ bodyText: 'Hi' });
+
+    expect(response.status).toBe(404);
+  });
+
+  it.each([
+    ['a missing body', {}],
+    ['an empty reply', { bodyText: '   ' }],
+    ['a reply that is too long', { bodyText: 'x'.repeat(20_001) }],
+  ])('rejects %s with 400', async (_case, body) => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+
+    const response = await client.post(`/api/tickets/${ticket.id}/replies`).send(body);
+
+    expect(response.status).toBe(400);
+    expect(await ctx.db.message.count({ where: { ticketId: ticket.id } })).toBe(2);
+  });
+});

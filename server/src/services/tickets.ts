@@ -149,6 +149,36 @@ export async function updateTicket({
   return getTicket(db, ticketId);
 }
 
+type AddReplyParams = {
+  db: Database;
+  ticketId: number;
+  authorId: string;
+  bodyText: string;
+};
+
+/**
+ * Saves an agent's reply on the ticket and sets the ticket to pending (waiting on the student).
+ * Replies aren't emailed yet.
+ */
+export async function addReply({ db, ticketId, authorId, bodyText }: AddReplyParams): Promise<TicketDetail> {
+  const ticket = await db.ticket.findUnique({
+    where: { id: ticketId },
+    select: { id: true }
+  });
+  if (!ticket) {
+    throw notFound(TICKET_NOT_FOUND);
+  }
+
+  await db.ticket.update({
+    where: { id: ticketId },
+    data: {
+      status: 'pending',
+      messages: { create: { direction: 'outbound', authorId, bodyText } },
+    },
+  });
+  return getTicket(db, ticketId);
+}
+
 /** Active users that aren't deleted, by name: everyone a ticket can be assigned to. */
 export async function listAssignees(db: Database): Promise<Assignee[]> {
   return db.user.findMany({

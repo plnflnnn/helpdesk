@@ -1,7 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import {
-  errorResponseSchema,
   ticketCategoryLabels,
   ticketCategorySchema,
   ticketPriorityLabels,
@@ -26,15 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { errorMessage } from '@/lib/errors';
 
 /** Assignee select value meaning "nobody". */
 const UNASSIGNED = 'unassigned';
-
-/** The server's `{ error }` message when there is one. */
-function errorMessage(error: Error) {
-  const body = isAxiosError(error) ? errorResponseSchema.safeParse(error.response?.data) : null;
-  return body?.success ? body.data.error : error.message;
-}
 
 type SelectFieldProps = {
   id: string;

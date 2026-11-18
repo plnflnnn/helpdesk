@@ -144,6 +144,19 @@ export const updateTicketInputSchema = z
   .refine((input) => Object.keys(input).length > 0, 'Provide at least one field to update');
 export type UpdateTicketInput = z.infer<typeof updateTicketInputSchema>;
 
+/** Longest reply accepted. */
+export const REPLY_MAX_LENGTH = 20_000;
+
+/** Body of `POST /api/tickets/:id/replies`. */
+export const replyInputSchema = z.object({
+  bodyText: z
+    .string()
+    .trim()
+    .min(1, 'Write a reply')
+    .max(REPLY_MAX_LENGTH, `Reply must be at most ${REPLY_MAX_LENGTH} characters`),
+});
+export type ReplyInput = z.infer<typeof replyInputSchema>;
+
 // Assignees.
 
 /** Someone a ticket can be assigned to: any active user (agents and admins). */

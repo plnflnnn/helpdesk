@@ -4,6 +4,7 @@ import {
   listTicketsResponseSchema,
   ticketResponseSchema,
   type ListTicketsQueryInput,
+  type ReplyInput,
   type UpdateTicketInput,
 } from '@helpdesk/shared';
 
@@ -23,6 +24,12 @@ export async function getTicket(id: number) {
 
 export async function updateTicket(id: number, input: UpdateTicketInput) {
   const { data } = await axios.patch(`/api/tickets/${id}`, input);
+  return ticketResponseSchema.parse(data).ticket;
+}
+
+/** Saves an agent reply; the ticket comes back with the reply added and its status set to pending. */
+export async function addReply(id: number, input: ReplyInput) {
+  const { data } = await axios.post(`/api/tickets/${id}/replies`, input);
   return ticketResponseSchema.parse(data).ticket;
 }
 
