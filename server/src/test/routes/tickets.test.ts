@@ -1,4 +1,10 @@
-import { listTicketsResponseSchema, Role, type TicketListItem } from '@helpdesk/shared';
+import {
+  listAssigneesResponseSchema,
+  listTicketsResponseSchema,
+  Role,
+  ticketResponseSchema,
+  type TicketListItem,
+} from '@helpdesk/shared';
 import { createTestContext } from '@/test/context.js';
 
 const ctx = createTestContext();
@@ -163,5 +169,210 @@ describe('GET /api/tickets', () => {
     const response = await listAs(query);
 
     expect(response.status).toBe(400);
+  });
+});
+
+/** A ticket with a student message followed by an agent reply. */
+async function seedConversation() {
+  const agent = await ctx.createUser();
+  const ticket = await ctx.db.ticket.create({
+    data: {
+      subject: 'Cannot log in',
+      category: 'technical_question',
+      student: { create: { email: 'mia@example.com', name: 'Mia' } },
+      messages: {
+        create: [
+          {
+            direction: 'inbound',
+            bodyText: 'The password reset email never arrived.',
+            createdAt: new Date(Date.UTC(2026, 10, 1)),
+          },
+          {
+            direction: 'outbound',
+            bodyText: 'I have sent it again.',
+            authorId: agent.id,
+            createdAt: new Date(Date.UTC(2026, 10, 2)),
+          },
+        ],
+      },
+    },
+  });
+  return { ticket, agent };
+}
+
+async function signedInAgent() {
+  const user = await ctx.createUser({ role: Role.agent });
+  return ctx.loginAs(user.email);
+}
+
+describe('GET /api/tickets/:id', () => {
+  it('rejects unauthenticated requests with 401', async () => {
+    expect((await ctx.client().get('/api/tickets/1')).status).toBe(401);
+  });
+
+  it('returns the ticket with its conversation, oldest message first', async () => {
+    const { ticket, agent } = await seedConversation();
+    const client = await signedInAgent();
+
+    const response = await client.get(`/api/tickets/${ticket.id}`);
+
+    expect(response.status).toBe(200);
+    const body = ticketResponseSchema.parse(response.body);
+    expect(body.ticket).toMatchObject({
+      id: ticket.id,
+      subject: 'Cannot log in',
+      status: 'open',
+      category: 'technical_question',
+      student: { email: 'mia@example.com', name: 'Mia' },
+      assignee: null,
+    });
+    expect(body.ticket.messages).toMatchObject([
+      { direction: 'inbound', author: null, bodyText: 'The password reset email never arrived.' },
+      {
+        direction: 'outbound',
+        author: { id: agent.id, name: agent.name },
+        bodyText: 'I have sent it again.',
+      },
+    ]);
+  });
+
+  it('responds 404 for a ticket that does not exist', async () => {
+    const client = await signedInAgent();
+
+    expect((await client.get('/api/tickets/999')).status).toBe(404);
+  });
+
+  it.each(['abc', '0', '-1', '1.5', '99999999999'])('rejects the id %s with 400', async (id) => {
+    const client = await signedInAgent();
+
+    expect((await client.get(`/api/tickets/${id}`)).status).toBe(400);
+  });
+});
+
+describe('PATCH /api/tickets/:id', () => {
+  it('rejects unauthenticated requests with 401', async () => {
+    const response = await ctx.client().patch('/api/tickets/1').send({ status: 'closed' });
+
+    expect(response.status).toBe(401);
+  });
+
+  it('updates the status and category', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+
+    const response = await client
+      .patch(`/api/tickets/${ticket.id}`)
+      .send({ status: 'resolved', category: 'refund_request' });
+
+    expect(response.status).toBe(200);
+    expect(ticketResponseSchema.parse(response.body).ticket).toMatchObject({
+      status: 'resolved',
+      category: 'refund_request',
+    });
+    expect(await ctx.db.ticket.findUnique({ where: { id: ticket.id } })).toMatchObject({
+      status: 'resolved',
+      category: 'refund_request',
+    });
+  });
+
+  it('assigns the ticket to an agent and unassigns it', async () => {
+    const { ticket, agent } = await seedConversation();
+    const client = await signedInAgent();
+
+    const assigned = await client.patch(`/api/tickets/${ticket.id}`).send({ assigneeId: agent.id });
+
+    expect(assigned.status).toBe(200);
+    expect(ticketResponseSchema.parse(assigned.body).ticket.assignee).toEqual({
+      id: agent.id,
+      name: agent.name,
+    });
+
+    const unassigned = await client.patch(`/api/tickets/${ticket.id}`).send({ assigneeId: null });
+
+    expect(unassigned.status).toBe(200);
+    expect(ticketResponseSchema.parse(unassigned.body).ticket.assignee).toBeNull();
+  });
+
+  it('leaves fields that are not sent unchanged', async () => {
+    const { ticket, agent } = await seedConversation();
+    await ctx.db.ticket.update({ where: { id: ticket.id }, data: { assigneeId: agent.id } });
+    const client = await signedInAgent();
+
+    const response = await client.patch(`/api/tickets/${ticket.id}`).send({ status: 'pending' });
+
+    expect(ticketResponseSchema.parse(response.body).ticket).toMatchObject({
+      status: 'pending',
+      category: 'technical_question',
+      assignee: { id: agent.id },
+    });
+  });
+
+  it.each([
+    ['an inactive user', { active: false }],
+    ['a deleted user', { deletedAt: new Date() }],
+  ])('refuses to assign %s', async (_case, data) => {
+    const { ticket } = await seedConversation();
+    const other = await ctx.createUser();
+    await ctx.db.user.update({ where: { id: other.id }, data });
+    const client = await signedInAgent();
+
+    const response = await client.patch(`/api/tickets/${ticket.id}`).send({ assigneeId: other.id });
+
+    expect(response.status).toBe(400);
+    expect((await ctx.db.ticket.findUnique({ where: { id: ticket.id } }))?.assigneeId).toBeNull();
+  });
+
+  it('refuses to assign a user that does not exist', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+
+    const response = await client.patch(`/api/tickets/${ticket.id}`).send({ assigneeId: 'nobody' });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('responds 404 for a ticket that does not exist', async () => {
+    const client = await signedInAgent();
+
+    const response = await client.patch('/api/tickets/999').send({ status: 'closed' });
+
+    expect(response.status).toBe(404);
+  });
+
+  it.each([
+    ['an empty body', {}],
+    ['an unknown status', { status: 'archived' }],
+    ['an unknown category', { category: 'spam' }],
+    ['an empty assignee id', { assigneeId: '' }],
+  ])('rejects %s with 400', async (_case, body) => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+
+    expect((await client.patch(`/api/tickets/${ticket.id}`).send(body)).status).toBe(400);
+  });
+});
+
+describe('GET /api/tickets/assignees', () => {
+  it('rejects unauthenticated requests with 401', async () => {
+    expect((await ctx.client().get('/api/tickets/assignees')).status).toBe(401);
+  });
+
+  it('lists active, non-deleted users by name', async () => {
+    const admin = await ctx.createUser({ role: Role.admin });
+    const agent = await ctx.createUser({ role: Role.agent });
+    const inactive = await ctx.createUser({ active: false });
+    const deleted = await ctx.createUser();
+    await ctx.db.user.update({ where: { id: deleted.id }, data: { deletedAt: new Date() } });
+    const client = await ctx.loginAs(agent.email);
+
+    const response = await client.get('/api/tickets/assignees');
+
+    expect(response.status).toBe(200);
+    const { assignees } = listAssigneesResponseSchema.parse(response.body);
+    expect(assignees).toEqual([
+      { id: admin.id, name: 'Ada Admin' },
+      { id: agent.id, name: 'Alan Agent' },
+    ]);
+    expect(assignees.map((a) => a.id)).not.toContain(inactive.id);
   });
 });

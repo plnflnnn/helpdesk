@@ -7,6 +7,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { createQueryClient } from '@/lib/queryClient';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { TicketDetailPage } from '@/pages/TicketDetailPage';
 import { TicketsPage } from '@/pages/TicketsPage';
 import { UsersPage } from '@/pages/UsersPage';
 
@@ -22,6 +23,7 @@ export function AppRoutes() {
         }
       >
         <Route index element={<TicketsPage />} />
+        <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route
           path="users"
           element={

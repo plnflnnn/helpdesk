@@ -75,6 +75,10 @@ type UpdateUserParams = {
   data: UpdateUserInput;
 };
 
+/**
+ * Updates the user. A new password or deactivation ends their sessions; deactivation also returns
+ * their tickets to the unassigned queue, since only active users can be assigned tickets.
+ */
 export async function updateUser({ db, userId, data }: UpdateUserParams): Promise<User> {
   await findExistingUser({ db, userId });
   if (data.email) {
@@ -83,7 +87,8 @@ export async function updateUser({ db, userId, data }: UpdateUserParams): Promis
 
   const { password, ...fields } = data;
   const passwordHash = password ? await hashPassword(password) : undefined;
-  const logOut = data.active === false || passwordHash !== undefined;
+  const deactivate = data.active === false;
+  const logOut = deactivate || passwordHash !== undefined;
 
   const user = await db.$transaction(async (tx) => {
     if (passwordHash) {
@@ -95,6 +100,9 @@ export async function updateUser({ db, userId, data }: UpdateUserParams): Promis
     }
     if (logOut) {
       await tx.session.deleteMany({ where: { userId } });
+    }
+    if (deactivate) {
+      await tx.ticket.updateMany({ where: { assigneeId: userId }, data: { assigneeId: null } });
     }
     return tx.user.update({
       where: { id: userId },

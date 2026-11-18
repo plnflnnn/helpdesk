@@ -216,6 +216,28 @@ describe('deactivation', () => {
     expect((await agentClient.get('/api/me')).status).toBe(200);
   });
 
+  it('returns the deactivated agent’s tickets to the unassigned queue', async () => {
+    const { client } = await loginAdmin();
+    const agent = await ctx.createUser();
+    const otherAgent = await ctx.createUser();
+    const student = await ctx.db.student.create({ data: { email: 'student@example.com' } });
+    const ticketFor = (assigneeId: string) =>
+      ctx.db.ticket.create({ data: { subject: 'Help', studentId: student.id, assigneeId } });
+    const unassigned = await ticketFor(agent.id);
+    const kept = await ticketFor(otherAgent.id);
+
+    const response = await client.patch(`/api/users/${agent.id}`).send({ active: false });
+
+    expect(response.status).toBe(200);
+    const tickets = await ctx.db.ticket.findMany({ select: { id: true, assigneeId: true } });
+    expect(tickets).toEqual(
+      expect.arrayContaining([
+        { id: unassigned.id, assigneeId: null },
+        { id: kept.id, assigneeId: otherAgent.id },
+      ]),
+    );
+  });
+
   it('does not let admins deactivate themselves', async () => {
     const { admin, client } = await loginAdmin();
 

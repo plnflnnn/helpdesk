@@ -96,3 +96,59 @@ export const listTicketsQuerySchema = z.object({
 export type ListTicketsQueryInput = z.input<typeof listTicketsQuerySchema>;
 /** What the server receives after parsing (defaults filled in). */
 export type ListTicketsQuery = z.output<typeof listTicketsQuerySchema>;
+
+// Ticket detail.
+
+export const messageDirectionSchema = z.enum(['inbound', 'outbound']);
+export type MessageDirection = z.infer<typeof messageDirectionSchema>;
+
+/** One email in a ticket's conversation. `author` is the agent who sent an outbound message. */
+export const ticketMessageSchema = z.object({
+  id: z.string(),
+  direction: messageDirectionSchema,
+  author: z.object({ id: z.string(), name: z.string() }).nullable(),
+  bodyText: z.string(),
+  createdAt: z.iso.datetime(),
+});
+export type TicketMessage = z.infer<typeof ticketMessageSchema>;
+
+/** A ticket with its whole conversation, oldest message first. */
+export const ticketDetailSchema = ticketListItemSchema.extend({
+  messages: z.array(ticketMessageSchema),
+});
+export type TicketDetail = z.infer<typeof ticketDetailSchema>;
+
+/** Response of `GET /api/tickets/:id` and `PATCH /api/tickets/:id`. */
+export const ticketResponseSchema = z.object({ ticket: ticketDetailSchema });
+export type TicketResponse = z.infer<typeof ticketResponseSchema>;
+
+/** Largest ticket id (Postgres `integer`). */
+const TICKET_ID_MAX = 2_147_483_647;
+
+/** Route params of `/api/tickets/:id`. */
+export const ticketIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive().max(TICKET_ID_MAX),
+});
+
+/**
+ * Body of `PATCH /api/tickets/:id`: any subset of status, category and assignee.
+ * `assigneeId: null` returns the ticket to the unassigned queue.
+ */
+export const updateTicketInputSchema = z
+  .object({
+    status: ticketStatusSchema,
+    category: ticketCategorySchema,
+    assigneeId: z.string().min(1).nullable(),
+  })
+  .partial()
+  .refine((input) => Object.keys(input).length > 0, 'Provide at least one field to update');
+export type UpdateTicketInput = z.infer<typeof updateTicketInputSchema>;
+
+// Assignees.
+
+/** Someone a ticket can be assigned to: any active user (agents and admins). */
+export const assigneeSchema = z.object({ id: z.string(), name: z.string() });
+export type Assignee = z.infer<typeof assigneeSchema>;
+
+export const listAssigneesResponseSchema = z.object({ assignees: z.array(assigneeSchema) });
+export type ListAssigneesResponse = z.infer<typeof listAssigneesResponseSchema>;

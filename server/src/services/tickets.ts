@@ -1,6 +1,17 @@
-import type { ListTicketsQuery, TicketListItem, TicketSortField } from '@helpdesk/shared';
+import type {
+  Assignee,
+  ListTicketsQuery,
+  TicketDetail,
+  TicketListItem,
+  TicketSortField,
+  UpdateTicketInput,
+} from '@helpdesk/shared';
 import type { Prisma } from '@generated/prisma/client.js';
 import type { Database } from '@/db.js';
+import { badRequest, notFound } from '@/errors.js';
+
+const TICKET_NOT_FOUND = 'Ticket not found';
+const ASSIGNEE_NOT_FOUND = 'This agent does not exist or is inactive';
 
 const ticketListSelect = {
   id: true,
@@ -71,4 +82,90 @@ export async function listTickets(
     orderBy,
   });
   return tickets.map(toTicketListItem);
+}
+
+const ticketDetailSelect = {
+  ...ticketListSelect,
+  messages: {
+    select: {
+      id: true,
+      direction: true,
+      bodyText: true,
+      createdAt: true,
+      author: { select: { id: true, name: true } },
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
+} as const satisfies Prisma.TicketSelect;
+
+type TicketDetailRecord = Prisma.TicketGetPayload<{ select: typeof ticketDetailSelect }>;
+
+function toTicketDetail(record: TicketDetailRecord): TicketDetail {
+  return {
+    ...toTicketListItem(record),
+    messages: record.messages.map((message) => ({
+      ...message,
+      createdAt: message.createdAt.toISOString(),
+    })),
+  };
+}
+
+/** The ticket with its conversation, or 404. */
+export async function getTicket(db: Database, ticketId: number): Promise<TicketDetail> {
+  const ticket = await db.ticket.findUnique({
+    where: { id: ticketId },
+    select: ticketDetailSelect,
+  });
+  if (!ticket) {
+    throw notFound(TICKET_NOT_FOUND);
+  }
+  return toTicketDetail(ticket);
+}
+
+type UpdateTicketParams = {
+  db: Database;
+  ticketId: number;
+  data: UpdateTicketInput;
+};
+
+/** Changes the ticket's status, category or assignee. Only active users can be assigned. */
+export async function updateTicket({
+  db,
+  ticketId,
+  data,
+}: UpdateTicketParams): Promise<TicketDetail> {
+  const { assigneeId, ...fields } = data;
+  if (assigneeId) {
+    await assertAssignable(db, assigneeId);
+  }
+
+  const { count } = await db.ticket.updateMany({
+    where: { id: ticketId },
+    data: { ...fields, assigneeId },
+  });
+  if (count === 0) {
+    throw notFound(TICKET_NOT_FOUND);
+  }
+  return getTicket(db, ticketId);
+}
+
+/** Active users that aren't deleted, by name: everyone a ticket can be assigned to. */
+export async function listAssignees(db: Database): Promise<Assignee[]> {
+  return db.user.findMany({
+    where: assignableWhere,
+    select: { id: true, name: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+}
+
+const assignableWhere = { active: true, deletedAt: null } as const satisfies Prisma.UserWhereInput;
+
+async function assertAssignable(db: Database, userId: string) {
+  const user = await db.user.findFirst({
+    where: { id: userId, ...assignableWhere },
+    select: { id: true },
+  });
+  if (!user) {
+    throw badRequest(ASSIGNEE_NOT_FOUND);
+  }
 }

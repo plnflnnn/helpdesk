@@ -1,8 +1,15 @@
 import { Router } from 'express';
-import { listTicketsQuerySchema, type ListTicketsResponse } from '@helpdesk/shared';
+import {
+  listTicketsQuerySchema,
+  ticketIdParamsSchema,
+  updateTicketInputSchema,
+  type ListAssigneesResponse,
+  type ListTicketsResponse,
+  type TicketResponse,
+} from '@helpdesk/shared';
 import { requireAuth } from '@/middleware/auth.js';
 import { validate } from '@/middleware/validate.js';
-import { listTickets } from '@/services/tickets.js';
+import { getTicket, listAssignees, listTickets, updateTicket } from '@/services/tickets.js';
 import type { Services } from '@/types.js';
 
 /** Tickets, available to every signed-in agent and admin. */
@@ -14,6 +21,27 @@ export function ticketsRouter({ db, auth }: Services) {
     const body: ListTicketsResponse = { tickets: await listTickets(db, req.query) };
     res.json(body);
   });
+
+  // Registered before `/:id` so "assignees" isn't read as a ticket id.
+  router.get('/assignees', async (_req, res) => {
+    const body: ListAssigneesResponse = { assignees: await listAssignees(db) };
+    res.json(body);
+  });
+
+  router.get('/:id', validate({ params: ticketIdParamsSchema }), async (req, res) => {
+    const body: TicketResponse = { ticket: await getTicket(db, req.params.id) };
+    res.json(body);
+  });
+
+  router.patch(
+    '/:id',
+    validate({ params: ticketIdParamsSchema, body: updateTicketInputSchema }),
+    async (req, res) => {
+      const ticket = await updateTicket({ db, ticketId: req.params.id, data: req.body });
+      const body: TicketResponse = { ticket };
+      res.json(body);
+    },
+  );
 
   return router;
 }

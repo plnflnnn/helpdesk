@@ -67,8 +67,15 @@ export function restoreApi() {
   axios.defaults.adapter = realAdapter;
 }
 
-/** The parsed JSON body of the first request the mock received for `url`, if any. */
-export function requestBody(adapter: ReturnType<typeof mockApi>, url: string): unknown {
-  const call = adapter.mock.calls.find(([config]) => config.url === url);
+/** The parsed JSON body of the first request the mock received for `url` (and `method`, if given). */
+export function requestBody(
+  adapter: ReturnType<typeof mockApi>,
+  url: string,
+  method?: string,
+): unknown {
+  const call = adapter.mock.calls.find(
+    ([config]) =>
+      config.url === url && (!method || config.method?.toUpperCase() === method.toUpperCase()),
+  );
   return call && typeof call[0].data === 'string' ? JSON.parse(call[0].data) : undefined;
 }

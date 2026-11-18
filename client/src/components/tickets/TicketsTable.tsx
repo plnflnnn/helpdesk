@@ -7,6 +7,7 @@ import {
   type OnChangeFn,
   type SortingState,
 } from '@tanstack/react-table';
+import { Link } from 'react-router';
 import { ticketCategoryLabels, type TicketListItem } from '@helpdesk/shared';
 import { cn } from '@/lib/utils';
 import { StatusBadge } from '@/components/tickets/TicketBadges';
@@ -30,9 +31,13 @@ const columns = column.columns([
   column.accessor('subject', {
     header: 'Subject',
     cell: (info) => (
-      <span className="block max-w-96 truncate font-medium" title={info.getValue()}>
+      <Link
+        to={`/tickets/${info.row.original.id}`}
+        className="block max-w-96 truncate font-medium underline-offset-4 hover:underline"
+        title={info.getValue()}
+      >
         {info.getValue()}
-      </span>
+      </Link>
     ),
   }),
   column.accessor('student', {
