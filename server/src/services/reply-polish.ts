@@ -1,7 +1,7 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import type { TicketDetail } from '@helpdesk/shared';
 import type { Database } from '@/db.js';
-import { badGateway, serviceUnavailable } from '@/errors.js';
+import { formatConversation, generate, requireModel } from '@/services/ai.js';
 import { getTicket } from '@/services/tickets.js';
 
 const INSTRUCTIONS = `You are an editor for the customer support team of an online course platform.
@@ -39,29 +39,14 @@ export async function polishReply({
   agentName,
   draft,
 }: PolishReplyParams): Promise<string> {
-  if (!model) {
-    throw serviceUnavailable('Reply polishing is not configured');
-  }
+  const configuredModel = requireModel(model);
   const ticket = await getTicket(db, ticketId);
-
-  let text: string;
-  try {
-    ({ text } = await generateText({
-      model,
-      instructions: INSTRUCTIONS,
-      prompt: buildPrompt(ticket, agentName, draft),
-      maxRetries: 1,
-      timeout: 30_000,
-    }));
-  } catch (error) {
-    console.error('Reply polishing failed', error);
-    throw badGateway('The AI service could not polish the reply. Try again.');
-  }
-
-  const body = text.trim();
-  if (!body) {
-    throw badGateway('The AI service returned an empty reply. Try again.');
-  }
+  const body = await generate({
+    model: configuredModel,
+    instructions: INSTRUCTIONS,
+    prompt: buildPrompt(ticket, agentName, draft),
+    task: 'polish the reply',
+  });
   return formatEmail({
     customerFirstName: firstName(ticket.student.name),
     agentFirstName: firstName(agentName),
@@ -89,15 +74,7 @@ function formatEmail({ customerFirstName, agentFirstName, body }: FormatEmailPar
 
 function buildPrompt(ticket: TicketDetail, agentName: string, draft: string) {
   const studentName = ticket.student.name ?? ticket.student.email;
-  const conversation = ticket.messages
-    .map((message) => {
-      const sender =
-        message.direction === 'inbound'
-          ? `Student (${studentName})`
-          : `Agent (${message.author?.name ?? 'Support'})`;
-      return `${sender}:\n${message.bodyText}`;
-    })
-    .join('\n\n---\n\n');
+  const conversation = formatConversation(ticket);
 
   return `Ticket subject: ${ticket.subject}
       Student: ${studentName}

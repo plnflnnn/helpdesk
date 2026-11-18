@@ -8,8 +8,8 @@ import type { Env } from '@/env.js';
 export type Services = {
   db: Database;
   auth: Auth;
-  /** Model that polishes agent replies; unset when no OpenAI key is configured. */
-  replyModel?: LanguageModel;
+  /** Model for AI features (reply polishing, ticket summaries); unset when no OpenAI key is configured. */
+  aiModel?: LanguageModel;
 };
 
 export type AppDependencies = {

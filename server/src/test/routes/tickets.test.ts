@@ -23,12 +23,12 @@ const modelReply = (text: string): GenerateResult => ({
 });
 
 const doGenerate = jest.fn<MockLanguageModelV4['doGenerate']>();
-const replyModel = new MockLanguageModelV4({ doGenerate });
-const ctx = createTestContext({ replyModel });
+const aiModel = new MockLanguageModelV4({ doGenerate });
+const ctx = createTestContext({ aiModel });
 
 beforeEach(async () => {
   doGenerate.mockReset();
-  replyModel.doGenerateCalls.length = 0;
+  aiModel.doGenerateCalls.length = 0;
   await ctx.reset();
 });
 afterAll(() => ctx.close());
@@ -565,6 +565,64 @@ describe('POST /api/tickets/:id/replies/polish', () => {
       .send({ bodyText: '   ' });
 
     expect(response.status).toBe(400);
+    expect(doGenerate).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/tickets/:id/summary', () => {
+  it('rejects unauthenticated requests with 401', async () => {
+    const response = await ctx.client().post('/api/tickets/1/summary');
+
+    expect(response.status).toBe(401);
+    expect(doGenerate).not.toHaveBeenCalled();
+  });
+
+  it('returns the summary without saving anything', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+    doGenerate.mockResolvedValue(modelReply('  Mia cannot log in.\n- Agent resent the email.  '));
+
+    const response = await client.post(`/api/tickets/${ticket.id}/summary`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ summary: 'Mia cannot log in.\n- Agent resent the email.' });
+    expect(await ctx.db.message.count({ where: { ticketId: ticket.id } })).toBe(2);
+  });
+
+  it('gives the model the ticket and the whole conversation', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+    doGenerate.mockResolvedValue(modelReply('Summary'));
+
+    await client.post(`/api/tickets/${ticket.id}/summary`);
+
+    const prompt = JSON.stringify(doGenerate.mock.calls[0]![0].prompt);
+    expect(prompt).toContain('Cannot log in');
+    expect(prompt).toContain('The password reset email never arrived.');
+    expect(prompt).toContain('I have sent it again.');
+  });
+
+  it('responds 502 when the model fails', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+    doGenerate.mockRejectedValue(new Error('upstream down'));
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await client.post(`/api/tickets/${ticket.id}/summary`);
+
+    consoleError.mockRestore();
+    expect(response.status).toBe(502);
+    expect(response.body).toEqual({
+      error: 'The AI service could not summarize the ticket. Try again.',
+    });
+  });
+
+  it('responds 404 for a ticket that does not exist', async () => {
+    const client = await signedInAgent();
+
+    const response = await client.post('/api/tickets/999/summary');
+
+    expect(response.status).toBe(404);
     expect(doGenerate).not.toHaveBeenCalled();
   });
 });

@@ -62,6 +62,12 @@ function mockTicketApi({ failWith = 0 } = {}) {
       current = { ...current, status: 'pending', messages: [...current.messages, reply] };
       return { status: 201, body: { ticket: current } };
     },
+    'POST /api/tickets/7/summary': () => {
+      if (failWith) {
+        return { status: 502, body: { error: 'The AI service could not summarize the ticket' } };
+      }
+      return { status: 200, body: { summary: 'Emma cannot log in.\n- Agent resent the email.' } };
+    },
     'POST /api/tickets/7/replies/polish': (body) => {
       if (failWith) {
         return { status: 502, body: { error: 'The AI service could not polish the reply' } };
@@ -245,6 +251,32 @@ describe('ticket detail page', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Reply')).toHaveValue('Hello');
+  });
+
+  it('summarizes the ticket below the message', async () => {
+    mockTicketApi();
+    renderApp('/tickets/7');
+    await screen.findByRole('heading', { name: ticket.subject });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }));
+
+    const summary = await screen.findByRole('region', { name: 'Summary' });
+    expect(summary).toHaveTextContent('Emma cannot log in. - Agent resent the email.');
+  });
+
+  it('says so when summarizing fails', async () => {
+    mockTicketApi({ failWith: 500 });
+    renderApp('/tickets/7');
+    await screen.findByRole('heading', { name: ticket.subject });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }));
+
+    expect(
+      await screen.findByText(
+        'Could not summarize the ticket: The AI service could not summarize the ticket',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Summary' })).not.toBeInTheDocument();
   });
 
   it('says so when the ticket does not exist', async () => {

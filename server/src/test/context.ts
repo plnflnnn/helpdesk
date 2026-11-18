@@ -18,12 +18,12 @@ type CreateTestUserOptions = {
 };
 
 type TestContextOptions = {
-  /** Model for reply polishing; use a `MockLanguageModelV4` from `ai/test`. */
-  replyModel?: LanguageModel;
+  /** Model for AI features; use a `MockLanguageModelV4` from `ai/test`. */
+  aiModel?: LanguageModel;
 };
 
 /** A real app wired to the test database. Call `reset()` before each test and `close()` after all. */
-export function createTestContext({ replyModel }: TestContextOptions = {}) {
+export function createTestContext({ aiModel }: TestContextOptions = {}) {
   const db = createPrismaClient(testDatabaseUrl());
   const auth = createAuth(db, {
     NODE_ENV: 'test',
@@ -33,7 +33,7 @@ export function createTestContext({ replyModel }: TestContextOptions = {}) {
   });
   const app = createApp({
     checkDatabase: async () => true,
-    services: { db, auth, replyModel },
+    services: { db, auth, aiModel },
   });
 
   async function reset() {

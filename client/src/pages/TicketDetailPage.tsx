@@ -6,6 +6,7 @@ import { ticketIdParamsSchema, type TicketDetail, type TicketMessage } from '@he
 import { getTicket, ticketQueryKey } from '@/api/tickets';
 import { ReplyForm } from '@/components/tickets/ReplyForm';
 import { StatusBadge } from '@/components/tickets/TicketBadges';
+import { TicketSummary } from '@/components/tickets/TicketSummary';
 import { TicketFieldsPanel } from '@/components/tickets/TicketFieldsPanel';
 import { cn } from '@/lib/utils';
 
@@ -83,9 +84,12 @@ function TicketView({ ticket }: { ticket: TicketDetail }) {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="flex flex-col gap-6">
-          <section aria-label="Message">
+          <section aria-label="Message" className="flex flex-col gap-3">
             {originalMessage ? (
-              <MessageCard message={originalMessage} studentName={studentName} />
+              <>
+                <MessageCard message={originalMessage} studentName={studentName} />
+                <TicketSummary key={ticket.id} ticketId={ticket.id} />
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">No message.</p>
             )}

@@ -172,6 +172,10 @@ export type ReplyInput = z.infer<typeof replyInputSchema>;
 export const polishReplyResponseSchema = z.object({ bodyText: z.string() });
 export type PolishReplyResponse = z.infer<typeof polishReplyResponseSchema>;
 
+/** Response of `POST /api/tickets/:id/summary`: an AI summary of the ticket and its conversation. */
+export const ticketSummaryResponseSchema = z.object({ summary: z.string() });
+export type TicketSummaryResponse = z.infer<typeof ticketSummaryResponseSchema>;
+
 // Assignees.
 
 /** Someone a ticket can be assigned to: any active user (agents and admins). */

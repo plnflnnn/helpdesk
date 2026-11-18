@@ -13,7 +13,7 @@ const app = createApp({
   services: {
     db,
     auth: createAuth(db, env),
-    replyModel: env.OPENAI_API_KEY
+    aiModel: env.OPENAI_API_KEY
       ? createOpenAI({ apiKey: env.OPENAI_API_KEY })(env.OPENAI_MODEL)
       : undefined,
   },

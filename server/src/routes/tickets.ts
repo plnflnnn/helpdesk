@@ -8,6 +8,7 @@ import {
   type ListTicketsResponse,
   type PolishReplyResponse,
   type TicketResponse,
+  type TicketSummaryResponse,
 } from '@helpdesk/shared';
 import { requireAuth } from '@/middleware/auth.js';
 import { validate } from '@/middleware/validate.js';
@@ -19,10 +20,11 @@ import {
   updateTicket,
 } from '@/services/tickets.js';
 import { polishReply } from '@/services/reply-polish.js';
+import { summarizeTicket } from '@/services/ticket-summary.js';
 import type { Services } from '@/types.js';
 
 /** Tickets, available to every signed-in agent and admin. */
-export function ticketsRouter({ db, auth, replyModel }: Services) {
+export function ticketsRouter({ db, auth, aiModel }: Services) {
   const router = Router();
   router.use(requireAuth(auth));
 
@@ -67,6 +69,13 @@ export function ticketsRouter({ db, auth, replyModel }: Services) {
     },
   );
 
+  // A POST because each call runs the AI and may give a different summary; nothing is saved.
+  router.post('/:id/summary', validate({ params: ticketIdParamsSchema }), async (req, res) => {
+    const summary = await summarizeTicket({ db, model: aiModel, ticketId: req.params.id });
+    const body: TicketSummaryResponse = { summary };
+    res.json(body);
+  });
+
   // Returns an improved version of the agent's draft; nothing is saved.
   router.post(
     '/:id/replies/polish',
@@ -74,7 +83,7 @@ export function ticketsRouter({ db, auth, replyModel }: Services) {
     async (req, res) => {
       const bodyText = await polishReply({
         db,
-        model: replyModel,
+        model: aiModel,
         ticketId: req.params.id,
         agentName: req.user!.name,
         draft: req.body.bodyText,

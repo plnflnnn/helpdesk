@@ -4,6 +4,7 @@ import {
   listTicketsResponseSchema,
   polishReplyResponseSchema,
   ticketResponseSchema,
+  ticketSummaryResponseSchema,
   type ListTicketsQueryInput,
   type ReplyInput,
   type UpdateTicketInput,
@@ -39,6 +40,12 @@ export async function addReply(id: number, input: ReplyInput) {
 export async function polishReply(id: number, input: ReplyInput) {
   const { data } = await axios.post(`/api/tickets/${id}/replies/polish`, input);
   return polishReplyResponseSchema.parse(data).bodyText;
+}
+
+/** Asks the AI for a short summary of the ticket and its conversation. */
+export async function summarizeTicket(id: number) {
+  const { data } = await axios.post(`/api/tickets/${id}/summary`);
+  return ticketSummaryResponseSchema.parse(data).summary;
 }
 
 /** Everyone a ticket can be assigned to. */

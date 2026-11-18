@@ -11,9 +11,9 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.url(),
   /** Public URL of the React app: the trusted origin for auth requests. */
   APP_URL: z.url().default('http://localhost:3000'),
-  /** Enables AI reply polishing. Without it, the polish endpoint responds 503. */
+  /** Enables AI features (reply polishing, ticket summaries). Without it, those endpoints respond 503. */
   OPENAI_API_KEY: z.string().min(1).optional(),
-  /** OpenAI model used to polish replies. */
+  /** OpenAI model used for AI features. */
   OPENAI_MODEL: z.string().min(1).default('gpt-5.4-mini'),
 });
 
