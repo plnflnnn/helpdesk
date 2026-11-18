@@ -14,7 +14,7 @@ const envSchema = z.object({
   /** Enables AI features (reply polishing, ticket summaries). Without it, those endpoints respond 503. */
   OPENAI_API_KEY: z.string().min(1).optional(),
   /** OpenAI model used for AI features. */
-  OPENAI_MODEL: z.string().min(1).default('gpt-5.4-mini'),
+  OPENAI_MODEL: z.string().min(1).default('gpt-5-mini'),
   /** SendGrid key for outbound email. Without it (or the from address), emails are logged instead of sent. */
   SENDGRID_API_KEY: z.string().min(1).optional(),
   /** The support address emails are sent from; must be a verified sender in SendGrid. */
