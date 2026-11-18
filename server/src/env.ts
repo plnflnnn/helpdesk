@@ -8,6 +8,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
   BETTER_AUTH_SECRET: z.string().min(32),
+  /** Public URL of the API. Defaults to APP_URL (same origin in production). */
   BETTER_AUTH_URL: z.url(),
   /** Public URL of the React app: the trusted origin for auth requests. */
   APP_URL: z.url().default('http://localhost:3000'),
@@ -30,7 +31,14 @@ const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 export function parseEnv(source: NodeJS.ProcessEnv): Env {
-  const result = envSchema.safeParse(source);
+  // In production the app and API share one origin, so the URLs fall back to each other and to
+  // RENDER_EXTERNAL_URL (set by Render on web services, e.g. https://helpdesk.onrender.com).
+  const appUrl = source.APP_URL || source.RENDER_EXTERNAL_URL || undefined;
+  const result = envSchema.safeParse({
+    ...source,
+    APP_URL: appUrl,
+    BETTER_AUTH_URL: source.BETTER_AUTH_URL || appUrl,
+  });
   if (!result.success) {
     throw new Error(`Invalid environment variables:\n${z.prettifyError(result.error)}`);
   }

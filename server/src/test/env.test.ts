@@ -30,6 +30,29 @@ describe('parseEnv', () => {
     );
   });
 
+  it('defaults APP_URL and BETTER_AUTH_URL to RENDER_EXTERNAL_URL', () => {
+    const env = parseEnv({
+      DATABASE_URL: required.DATABASE_URL,
+      BETTER_AUTH_SECRET: required.BETTER_AUTH_SECRET,
+      RENDER_EXTERNAL_URL: 'https://helpdesk.onrender.com',
+    });
+
+    expect(env.APP_URL).toBe('https://helpdesk.onrender.com');
+    expect(env.BETTER_AUTH_URL).toBe('https://helpdesk.onrender.com');
+  });
+
+  it('defaults BETTER_AUTH_URL to APP_URL', () => {
+    const env = parseEnv({
+      DATABASE_URL: required.DATABASE_URL,
+      BETTER_AUTH_SECRET: required.BETTER_AUTH_SECRET,
+      APP_URL: 'https://support.example.com',
+      RENDER_EXTERNAL_URL: 'https://helpdesk.onrender.com',
+    });
+
+    expect(env.APP_URL).toBe('https://support.example.com');
+    expect(env.BETTER_AUTH_URL).toBe('https://support.example.com');
+  });
+
   it('throws when BETTER_AUTH_SECRET is shorter than 32 characters', () => {
     expect(() => parseEnv({ ...required, BETTER_AUTH_SECRET: 'short' })).toThrow(
       /BETTER_AUTH_SECRET/,

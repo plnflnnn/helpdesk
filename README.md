@@ -94,9 +94,29 @@ Without `SENDGRID_API_KEY`, outgoing emails are printed to the server console in
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier |
 | `npm run db:migrate` | Create/apply Prisma migrations |
+| `npm run db:deploy` | Apply pending migrations without creating new ones (production) |
 | `npm run db:generate` | Regenerate the Prisma client |
 | `npm run db:seed` | Create the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`, plus demo agents and tickets outside production (safe to re-run) |
 | `npm run db:seed:replies` | Add demo conversations to resolved tickets (safe to re-run) |
+
+## Deploy to Render
+
+[render.yaml](render.yaml) is a Render Blueprint that creates three resources:
+
+- **helpdesk**: a web service that runs the API and serves the built React app. Before each deploy it applies migrations (`npm run db:deploy`) and creates the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` (no demo data in production).
+- **helpdesk-worker**: a background worker that runs the pg-boss jobs (AI classification and auto-resolve).
+- **helpdesk-db**: PostgreSQL 17. Render supports pgvector.
+
+Steps:
+
+1. Push the repo to GitHub or GitLab. In Render, choose **New → Blueprint** and select the repo.
+2. Fill in the values Render asks for:
+   - Required: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`.
+   - On the worker, `APP_URL`: the web service URL, e.g. `https://helpdesk.onrender.com`.
+   - Optional: `OPENAI_API_KEY`, `SENDGRID_INBOUND_SECRET` (`openssl rand -hex 24`), and the Sentry DSNs.
+3. Point SendGrid Inbound Parse at `https://<your-host>/webhooks/inbound?secret=<SENDGRID_INBOUND_SECRET>`.
+
+On the web service, `APP_URL` and `BETTER_AUTH_URL` default to its `onrender.com` URL. If you add a custom domain, set `APP_URL` on both services. `BETTER_AUTH_SECRET` is generated once and shared through the `helpdesk-shared` environment group.
 
 ## Project structure
 
