@@ -18,16 +18,16 @@ const s = (name: string | null, email: string): Student => ({ name, email });
 
 // Students who write in more than once.
 const repeatStudents = {
-  emma: s('Emma Thompson', 'emma.thompson@gmail.com'),
-  liam: s('Liam O’Connor', 'liam.oconnor@outlook.com'),
-  sofia: s('Sofia Rossi', 'sofia.rossi@libero.it'),
-  noah: s('Noah Williams', 'noah.w@yahoo.com'),
-  aisha: s('Aisha Khan', 'aisha.khan@protonmail.com'),
-  kenji: s('Kenji Tanaka', 'kenji.tanaka@gmail.com'),
-  olivia: s('Olivia Martin', 'olivia.martin@icloud.com'),
-  mateo: s('Mateo García', 'mateo.garcia@gmail.com'),
-  hannah: s('Hannah Becker', 'hannah.becker@web.de'),
-  ravi: s('Ravi Sharma', 'ravi.sharma@gmail.com'),
+  emma: s('Emma Thompson', 'emma.thompson@helpdesk.students.test'),
+  liam: s('Liam O’Connor', 'liam.oconnor@helpdesk.students.test'),
+  sofia: s('Sofia Rossi', 'sofia.rossi@helpdesk.students.test'),
+  noah: s('Noah Williams', 'noah.w@helpdesk.students.test'),
+  aisha: s('Aisha Khan', 'aisha.khan@helpdesk.students.test'),
+  kenji: s('Kenji Tanaka', 'kenji.tanaka@helpdesk.students.test'),
+  olivia: s('Olivia Martin', 'olivia.martin@helpdesk.students.test'),
+  mateo: s('Mateo García', 'mateo.garcia@helpdesk.students.test'),
+  hannah: s('Hannah Becker', 'hannah.becker@helpdesk.students.test'),
+  ravi: s('Ravi Sharma', 'ravi.sharma@helpdesk.students.test'),
 };
 
 const t = (
@@ -48,18 +48,18 @@ export const demoTickets: DemoTicket[] = [
     'Hi, I reset my password this morning and got the confirmation email, but when I try to log in with the new password it says "Invalid email or password". I’ve tried three times and now I’m worried I’ll get locked out. I have an exam on Friday so I really need access to my course.',
   ),
   t(
-    s('James Carter', 'jcarter88@hotmail.com'),
+    s('James Carter', 'jcarter88@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Password reset email never arrives',
-    'I requested a password reset link four times over the last hour and nothing has arrived. I checked spam and promotions. My email is jcarter88@hotmail.com. Can you reset it manually?',
+    'I requested a password reset link four times over the last hour and nothing has arrived. I checked spam and promotions. My email is jcarter88@helpdesk.students.test. Can you reset it manually?',
   ),
   t(
-    s('Fatima Al-Sayed', 'fatima.alsayed@gmail.com'),
+    s('Fatima Al-Sayed', 'fatima.alsayed@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Two accounts with different emails — can you merge them?',
-    'I accidentally bought the Python course with my work email and the React course with my personal one. Is there a way to merge them so all my courses are in one place? Work: f.alsayed@brightlabs.io, personal: this one.',
+    'I accidentally bought the Python course with my work email and the React course with my personal one. Is there a way to merge them so all my courses are in one place? Work: f.alsayed@helpdesk.students.test, personal: this one.',
   ),
   t(
     repeatStudents.noah,
@@ -69,14 +69,14 @@ export const demoTickets: DemoTicket[] = [
     'My account says it’s locked for "suspicious activity". I was only trying to log in from my new laptop. Please unlock it, I’m in the middle of the SQL bootcamp.',
   ),
   t(
-    s('Chloe Dubois', 'chloe.dubois@orange.fr'),
+    s('Chloe Dubois', 'chloe.dubois@helpdesk.students.test'),
     'general_question',
     'low',
     'How do I change the email on my account?',
     'I’m leaving my university soon and will lose access to my student email. How do I change the email address on my account without losing my progress?',
   ),
   t(
-    s(null, 'dev.student.2024@gmail.com'),
+    s(null, 'dev.student.2024@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Google sign-in button not working',
@@ -90,7 +90,7 @@ export const demoTickets: DemoTicket[] = [
     'I set up two-factor authentication yesterday and today every code from my authenticator app is rejected. My phone clock is set automatically. Do you have backup codes for me?',
   ),
   t(
-    s('Lucas Silva', 'lucas.silva@uol.com.br'),
+    s('Lucas Silva', 'lucas.silva@helpdesk.students.test'),
     'other',
     'normal',
     'Please delete my account and data',
@@ -106,7 +106,7 @@ export const demoTickets: DemoTicket[] = [
     'Since yesterday none of the videos in "Complete Node.js Course" will play. They just show the spinner forever. Other websites like YouTube work fine. I’m on a 200 Mbps connection.',
   ),
   t(
-    s('Daniel Kim', 'daniel.kim@naver.com'),
+    s('Daniel Kim', 'daniel.kim@helpdesk.students.test'),
     'technical_question',
     'normal',
     'No sound in lesson 4.3',
@@ -120,14 +120,14 @@ export const demoTickets: DemoTicket[] = [
     'The English subtitles in section 7 of the Python course are about 3 seconds behind the audio. Not a huge deal but it’s distracting.',
   ),
   t(
-    s('Grace Lee', 'grace.lee@student.unimelb.edu.au'),
+    s('Grace Lee', 'grace.lee@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Playback speed resets every lesson',
     'Every time I go to the next lesson the speed goes back to 1x. Could it remember 1.5x? Watching on Firefox.',
   ),
   t(
-    s('Ahmed Hassan', 'ahmed.hassan@yahoo.com'),
+    s('Ahmed Hassan', 'ahmed.hassan@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Video quality stuck at 360p',
@@ -141,7 +141,7 @@ export const demoTickets: DemoTicket[] = [
     'I’m travelling next week with no internet. The download button in the iOS app spins and then shows "Download failed". I have 40 GB free.',
   ),
   t(
-    s('Tomás Novak', 'tomas.novak@seznam.cz'),
+    s('Tomás Novak', 'tomas.novak@helpdesk.students.test'),
     'technical_question',
     'low',
     'Lesson marked complete but progress bar still 98%',
@@ -164,14 +164,14 @@ export const demoTickets: DemoTicket[] = [
     'The resources tab for section 5 of the React course says "starter-files.zip" but the link gives a 404. Could you reupload it?',
   ),
   t(
-    s('Isabella Moretti', 'isabella.moretti@gmail.com'),
+    s('Isabella Moretti', 'isabella.moretti@helpdesk.students.test'),
     'technical_question',
     'normal',
     'npm install fails on the project from lesson 22',
     'Running npm install on the course project gives ERESOLVE unable to resolve dependency tree (react@19 vs some peer dependency). I’m on Node 24. Is the project outdated?',
   ),
   t(
-    s('Ethan Brooks', 'ethan.brooks@gmail.com'),
+    s('Ethan Brooks', 'ethan.brooks@helpdesk.students.test'),
     'technical_question',
     'low',
     'Typo in the quiz answer for lesson 9',
@@ -185,7 +185,7 @@ export const demoTickets: DemoTicket[] = [
     'The docker-compose.yml from the backend course exits with "password authentication failed for user postgres". I copied it exactly.',
   ),
   t(
-    s('Yuki Sato', 'yuki.sato@docomo.ne.jp'),
+    s('Yuki Sato', 'yuki.sato@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Code editor exercise won’t accept correct solution',
@@ -199,14 +199,14 @@ export const demoTickets: DemoTicket[] = [
     'The downloadable SQL cheat sheet PDF is very low resolution when printed. Is there a higher quality version?',
   ),
   t(
-    s('Oliver Wright', 'oliver.wright@btinternet.com'),
+    s('Oliver Wright', 'oliver.wright@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Python environment setup on M3 Mac fails',
     'Following the setup lesson, pip install pandas fails with a long error about building wheels on my M3 MacBook. Python 3.13. Any tips?',
   ),
   t(
-    s('Mia Schneider', 'mia.schneider@gmx.de'),
+    s('Mia Schneider', 'mia.schneider@helpdesk.students.test'),
     'technical_question',
     'high',
     'Final project submission upload fails right before deadline',
@@ -222,21 +222,21 @@ export const demoTickets: DemoTicket[] = [
     'My certificate for the JavaScript course says "Emma Thomson" — it should be "Thompson" with a p. I need it for a job application. Could you reissue it?',
   ),
   t(
-    s('Carlos Mendoza', 'carlos.mendoza@gmail.com'),
+    s('Carlos Mendoza', 'carlos.mendoza@helpdesk.students.test'),
     'general_question',
     'normal',
     'Is the certificate accredited?',
     'Is your certificate of completion accredited or recognised by employers? My company will reimburse the course only if it’s an accredited certificate.',
   ),
   t(
-    s('Nina Petrova', 'nina.petrova@yandex.ru'),
+    s('Nina Petrova', 'nina.petrova@helpdesk.students.test'),
     'general_question',
     'low',
     'How do I add my certificate to LinkedIn?',
     'I finished the Data Science course. Is there a direct link I can use to add the certificate to my LinkedIn profile under Licenses & certifications?',
   ),
   t(
-    s('Benjamin Clark', 'ben.clark@gmail.com'),
+    s('Benjamin Clark', 'ben.clark@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Certificate download gives a blank PDF',
@@ -250,7 +250,7 @@ export const demoTickets: DemoTicket[] = [
     'My employer asks for the number of training hours. Could the certificate show the course length, or can you send a letter confirming it?',
   ),
   t(
-    s(null, 'k.nowak@onet.pl'),
+    s(null, 'k.nowak@helpdesk.students.test'),
     'general_question',
     'normal',
     'Certificate not issued after finishing course',
@@ -259,7 +259,7 @@ export const demoTickets: DemoTicket[] = [
 
   // Refunds
   t(
-    s('Ryan Mitchell', 'ryan.mitchell@gmail.com'),
+    s('Ryan Mitchell', 'ryan.mitchell@helpdesk.students.test'),
     'refund_request',
     'high',
     'Refund request — bought the wrong course',
@@ -273,14 +273,14 @@ export const demoTickets: DemoTicket[] = [
     'My credit card statement shows two charges of $149 on 3 November for the Node.js course. I only bought it once. Please refund the duplicate.',
   ),
   t(
-    s('Jessica Turner', 'jess.turner@outlook.com'),
+    s('Jessica Turner', 'jess.turner@helpdesk.students.test'),
     'refund_request',
     'high',
     'Course is not what was advertised — refund please',
     'The course page says it covers Next.js App Router but the videos use the old pages router throughout. This isn’t what I paid for. I’d like a refund within your 30-day guarantee.',
   ),
   t(
-    s('Mohammed Ali', 'm.ali@gmail.com'),
+    s('Mohammed Ali', 'm.ali@helpdesk.students.test'),
     'refund_request',
     'high',
     'Annual subscription renewed without notice',
@@ -294,21 +294,21 @@ export const demoTickets: DemoTicket[] = [
     'The live bootcamp moved from evenings to mornings, and I work during the day. Since the schedule changed after I paid, can I get a refund or transfer to the next cohort?',
   ),
   t(
-    s('Laura Fischer', 'laura.fischer@t-online.de'),
+    s('Laura Fischer', 'laura.fischer@helpdesk.students.test'),
     'refund_request',
     'high',
     'Refund — technical issues made the course unusable',
     'I’ve had video playback problems for three weeks, contacted support twice and it’s still not fixed. I’d like a refund at this point.',
   ),
   t(
-    s('Samuel Okafor', 'samuel.okafor@gmail.com'),
+    s('Samuel Okafor', 'samuel.okafor@helpdesk.students.test'),
     'refund_request',
     'normal',
     'Can I get a partial refund?',
     'I bought the bundle of 5 courses but only want 3 of them. Is a partial refund possible for the two I haven’t started?',
   ),
   t(
-    s('Elena Vasquez', 'elena.vasquez@hotmail.es'),
+    s('Elena Vasquez', 'elena.vasquez@helpdesk.students.test'),
     'refund_request',
     'high',
     'Refund after 45 days?',
@@ -322,21 +322,21 @@ export const demoTickets: DemoTicket[] = [
     'There’s a purchase on my account for "Machine Learning A-Z" that I didn’t make. I think someone got into my account. Please refund and help me secure it.',
   ),
   t(
-    s('Zara Ahmed', 'zara.ahmed@gmail.com'),
+    s('Zara Ahmed', 'zara.ahmed@helpdesk.students.test'),
     'refund_request',
     'normal',
     'Child bought a course without permission',
     'My 12-year-old bought a $99 course using my saved card. Could you please refund this? It hasn’t been used.',
   ),
   t(
-    s(null, 'billing@quickstartcoders.com'),
+    s(null, 'billing@helpdesk.students.test'),
     'refund_request',
     'normal',
     'Refund for unused team seats',
     'We purchased 20 team seats but only 12 were ever activated. Can we get a refund for the 8 unused seats on invoice INV-2026-0912?',
   ),
   t(
-    s('Victor Lindqvist', 'victor.lindqvist@telia.se'),
+    s('Victor Lindqvist', 'victor.lindqvist@helpdesk.students.test'),
     'refund_request',
     'high',
     'Still waiting for the refund you approved',
@@ -345,7 +345,7 @@ export const demoTickets: DemoTicket[] = [
 
   // Billing & payments
   t(
-    s('Priyanka Rao', 'priyanka.rao@gmail.com'),
+    s('Priyanka Rao', 'priyanka.rao@helpdesk.students.test'),
     'general_question',
     'normal',
     'Need a VAT invoice for my purchase',
@@ -359,14 +359,14 @@ export const demoTickets: DemoTicket[] = [
     'I keep getting "Payment declined" at checkout with my Visa debit card. My bank says they haven’t blocked anything. Is there another way to pay?',
   ),
   t(
-    s('Andrea Costa', 'andrea.costa@gmail.com'),
+    s('Andrea Costa', 'andrea.costa@helpdesk.students.test'),
     'general_question',
     'low',
     'Do you accept PayPal?',
     'I don’t have a credit card. Can I pay with PayPal or bank transfer?',
   ),
   t(
-    s('Hiroshi Yamamoto', 'h.yamamoto@gmail.com'),
+    s('Hiroshi Yamamoto', 'h.yamamoto@helpdesk.students.test'),
     'general_question',
     'low',
     'Prices in Japanese yen?',
@@ -380,21 +380,21 @@ export const demoTickets: DemoTicket[] = [
     'I’m currently on the monthly plan. If I switch to annual now, will I be credited for the rest of this month?',
   ),
   t(
-    s('Peter Jansen', 'peter.jansen@ziggo.nl'),
+    s('Peter Jansen', 'peter.jansen@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Discount code says expired',
     'The code BLACKFRIDAY40 from your newsletter says "expired" at checkout, but the email says it’s valid until the 30th.',
   ),
   t(
-    s('Amara Nwosu', 'amara.nwosu@yahoo.com'),
+    s('Amara Nwosu', 'amara.nwosu@helpdesk.students.test'),
     'general_question',
     'normal',
     'Student discount verification',
     'I’m a full-time student at the University of Lagos. How do I verify my status to get the student discount?',
   ),
   t(
-    s('George Harris', 'george.harris@gmail.com'),
+    s('George Harris', 'george.harris@helpdesk.students.test'),
     'general_question',
     'normal',
     'How do I cancel my subscription?',
@@ -410,7 +410,7 @@ export const demoTickets: DemoTicket[] = [
     'I just finished the JavaScript fundamentals course. Should I go to React next or learn Node.js first? My goal is to get a junior full-stack job.',
   ),
   t(
-    s('Sara Lindgren', 'sara.lindgren@gmail.com'),
+    s('Sara Lindgren', 'sara.lindgren@helpdesk.students.test'),
     'general_question',
     'low',
     'Is the Python course suitable for complete beginners?',
@@ -424,14 +424,14 @@ export const demoTickets: DemoTicket[] = [
     'You mentioned an advanced TypeScript course in the newsletter a few months ago. Is there a release date? I’d like to plan my learning.',
   ),
   t(
-    s('Felix Wagner', 'felix.wagner@posteo.de'),
+    s('Felix Wagner', 'felix.wagner@helpdesk.students.test'),
     'general_question',
     'low',
     'Will the React course be updated for React 19?',
     'Some lessons still use class components and the old context API. Do you plan to update the course? Will existing students get the update for free?',
   ),
   t(
-    s('Lily Chen', 'lily.chen@qq.com'),
+    s('Lily Chen', 'lily.chen@helpdesk.students.test'),
     'general_question',
     'normal',
     'How long do I have access to the course?',
@@ -445,35 +445,35 @@ export const demoTickets: DemoTicket[] = [
     'In lesson 14 you say the inner function "remembers" the variable. But when I run the for-loop example with var instead of let, all callbacks print 5. Why does let fix it?',
   ),
   t(
-    s('Jack Robinson', 'jack.robinson@gmail.com'),
+    s('Jack Robinson', 'jack.robinson@helpdesk.students.test'),
     'general_question',
     'low',
     'Is there a community or Discord?',
     'Is there a Discord or forum where students can ask questions and find study partners?',
   ),
   t(
-    s('Valentina Romero', 'valentina.romero@gmail.com'),
+    s('Valentina Romero', 'valentina.romero@helpdesk.students.test'),
     'general_question',
     'normal',
     'Can I get mentor feedback on my portfolio?',
     'The course page mentions code reviews. How do I submit my portfolio project for feedback from a mentor?',
   ),
   t(
-    s('Arjun Mehta', 'arjun.mehta@iitb.ac.in'),
+    s('Arjun Mehta', 'arjun.mehta@helpdesk.students.test'),
     'general_question',
     'low',
     'Is there a recommended order for the data science path?',
     'The data science path has 8 courses. Is there a recommended order, or can I take them in any order?',
   ),
   t(
-    s('Charlotte Evans', 'charlotte.evans@gmail.com'),
+    s('Charlotte Evans', 'charlotte.evans@helpdesk.students.test'),
     'general_question',
     'normal',
     'Do the courses prepare for the AWS certification exam?',
     'Does the cloud fundamentals course cover everything needed for the AWS Certified Cloud Practitioner exam?',
   ),
   t(
-    s(null, 'learner_4471@proton.me'),
+    s(null, 'learner_4471@helpdesk.students.test'),
     'general_question',
     'low',
     'Are the courses available in Spanish?',
@@ -489,14 +489,14 @@ export const demoTickets: DemoTicket[] = [
 
   // Live sessions & cohorts
   t(
-    s('Michael Brown', 'mike.brown@gmail.com'),
+    s('Michael Brown', 'mike.brown@helpdesk.students.test'),
     'general_question',
     'normal',
     'Where can I find the live session recording?',
     'I missed Tuesday’s live Q&A because of a time zone mix-up. Is there a recording?',
   ),
   t(
-    s('Ana Souza', 'ana.souza@gmail.com'),
+    s('Ana Souza', 'ana.souza@helpdesk.students.test'),
     'technical_question',
     'high',
     'Zoom link for today’s workshop doesn’t work',
@@ -510,7 +510,7 @@ export const demoTickets: DemoTicket[] = [
     'My work schedule changed and I can’t make the evening sessions anymore. Can I move to the January cohort without paying again?',
   ),
   t(
-    s('William Foster', 'will.foster@icloud.com'),
+    s('William Foster', 'will.foster@helpdesk.students.test'),
     'general_question',
     'low',
     'Time zone of the live sessions?',
@@ -519,7 +519,7 @@ export const demoTickets: DemoTicket[] = [
 
   // Mobile app
   t(
-    s('Emily Davis', 'emily.davis@gmail.com'),
+    s('Emily Davis', 'emily.davis@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Android app crashes on launch',
@@ -533,7 +533,7 @@ export const demoTickets: DemoTicket[] = [
     'I watched lessons 10–15 on my phone yesterday but on the website they still show as not started.',
   ),
   t(
-    s('Kofi Mensah', 'kofi.mensah@gmail.com'),
+    s('Kofi Mensah', 'kofi.mensah@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Can’t log into the iPad app',
@@ -549,28 +549,28 @@ export const demoTickets: DemoTicket[] = [
 
   // Teams & business
   t(
-    s('Rachel Green', 'rachel.green@acmecorp.com'),
+    s('Rachel Green', 'rachel.green@helpdesk.students.test'),
     'general_question',
     'normal',
     'Pricing for a team of 25 developers',
     'We’d like to give our 25 developers access to the full catalogue. Do you offer team plans and an admin dashboard to track progress?',
   ),
   t(
-    s(null, 'it-admin@northwind.io'),
+    s(null, 'it-admin@helpdesk.students.test'),
     'technical_question',
     'normal',
     'SSO integration with Okta',
     'Does your business plan support SAML SSO with Okta? Our security policy requires it for all tools.',
   ),
   t(
-    s('Daniel Schwartz', 'daniel.schwartz@fintechlabs.com'),
+    s('Daniel Schwartz', 'daniel.schwartz@helpdesk.students.test'),
     'general_question',
     'normal',
     'Reassign a seat from a leaving employee',
     'One of our developers is leaving. Can we reassign their seat to a new hire and keep the history for our records?',
   ),
   t(
-    s('Megan O’Brien', 'megan.obrien@globex.com'),
+    s('Megan O’Brien', 'megan.obrien@helpdesk.students.test'),
     'general_question',
     'low',
     'Can we get a usage report for Q3?',
@@ -586,14 +586,14 @@ export const demoTickets: DemoTicket[] = [
 
   // Accessibility
   t(
-    s('Thomas Müller', 'thomas.mueller@gmail.com'),
+    s('Thomas Müller', 'thomas.mueller@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Screen reader can’t read the quiz options',
     'I use NVDA. On quiz pages the answer options are read as "clickable" with no text, so I can’t complete the quizzes.',
   ),
   t(
-    s('Isla MacDonald', 'isla.macdonald@gmail.com'),
+    s('Isla MacDonald', 'isla.macdonald@helpdesk.students.test'),
     'general_question',
     'normal',
     'Transcripts for the videos?',
@@ -609,14 +609,14 @@ export const demoTickets: DemoTicket[] = [
     'It would be great to take timestamped notes while watching, like some other platforms do. Just a suggestion!',
   ),
   t(
-    s('Freya Hansen', 'freya.hansen@gmail.com'),
+    s('Freya Hansen', 'freya.hansen@helpdesk.students.test'),
     'other',
     'low',
     'Loved the SQL course — thank you!',
     'Just wanted to say the SQL course was brilliant. I passed my data analyst interview yesterday and the window functions section helped a lot. Thanks!',
   ),
   t(
-    s('Oscar Nilsson', 'oscar.nilsson@gmail.com'),
+    s('Oscar Nilsson', 'oscar.nilsson@helpdesk.students.test'),
     'other',
     'low',
     'Feedback on the instructor’s pace',
@@ -630,7 +630,7 @@ export const demoTickets: DemoTicket[] = [
     'Could you add keyboard shortcuts like J/K/L for seeking? Space works but nothing else does.',
   ),
   t(
-    s('Leo Fernandes', 'leo.fernandes@gmail.com'),
+    s('Leo Fernandes', 'leo.fernandes@helpdesk.students.test'),
     'other',
     'normal',
     'Complaint about a rude reply in the Q&A',
@@ -646,28 +646,28 @@ export const demoTickets: DemoTicket[] = [
 
   // Partnerships, press & misc
   t(
-    s('Julia Novak', 'julia@techpodcast.fm'),
+    s('Julia Novak', 'julia@helpdesk.students.test'),
     'other',
     'low',
     'Podcast interview request',
     'I host a podcast for career changers in tech and would love to interview your founder. Who should I contact?',
   ),
   t(
-    s(null, 'partnerships@codecamp-berlin.de'),
+    s(null, 'partnerships@helpdesk.students.test'),
     'other',
     'normal',
     'Partnership proposal for our bootcamp',
     'We run an in-person bootcamp in Berlin and would like to offer your courses to our graduates at a discount. Could we schedule a call?',
   ),
   t(
-    s('Marco Bianchi', 'marco.bianchi@gmail.com'),
+    s('Marco Bianchi', 'marco.bianchi@helpdesk.students.test'),
     'other',
     'low',
     'Can I become an instructor?',
     'I’m a senior Kotlin developer and would like to teach a course on your platform. What’s the process?',
   ),
   t(
-    s('Sophie Laurent', 'sophie.laurent@gmail.com'),
+    s('Sophie Laurent', 'sophie.laurent@helpdesk.students.test'),
     'other',
     'normal',
     'Someone is reselling your courses',
@@ -681,7 +681,7 @@ export const demoTickets: DemoTicket[] = [
     'I joined the affiliate program three months ago. When are payouts made and what’s the minimum balance?',
   ),
   t(
-    s('Ibrahim Yusuf', 'ibrahim.yusuf@gmail.com'),
+    s('Ibrahim Yusuf', 'ibrahim.yusuf@helpdesk.students.test'),
     'other',
     'normal',
     'Request for financial aid / scholarship',
@@ -697,14 +697,14 @@ export const demoTickets: DemoTicket[] = [
     'I received an email that looks like it’s from you asking me to "verify my account" by entering my password. The link goes to a strange domain. Is this phishing?',
   ),
   t(
-    s('Henrik Larsen', 'henrik.larsen@gmail.com'),
+    s('Henrik Larsen', 'henrik.larsen@helpdesk.students.test'),
     'technical_question',
     'high',
     'Someone changed my account email',
     'I got a notification that my email was changed to an address I don’t recognise. I can’t log in anymore. Please help me recover my account.',
   ),
   t(
-    s('Natalia Kowalski', 'natalia.kowalski@wp.pl'),
+    s('Natalia Kowalski', 'natalia.kowalski@helpdesk.students.test'),
     'general_question',
     'normal',
     'How do I export my data?',
@@ -713,14 +713,14 @@ export const demoTickets: DemoTicket[] = [
 
   // Gifts
   t(
-    s('Paul Anderson', 'paul.anderson@gmail.com'),
+    s('Paul Anderson', 'paul.anderson@helpdesk.students.test'),
     'general_question',
     'normal',
     'Gift a course to my nephew',
     'Can I buy a course as a gift and have it sent on his birthday (December 12)?',
   ),
   t(
-    s('Clara Weber', 'clara.weber@gmx.at'),
+    s('Clara Weber', 'clara.weber@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Gift code won’t redeem',
@@ -728,9 +728,9 @@ export const demoTickets: DemoTicket[] = [
   ),
 
   // Short / vague emails
-  t(s(null, 'jdoe1990@gmail.com'), 'other', 'normal', 'help', 'it doesnt work'),
+  t(s(null, 'jdoe1990@helpdesk.students.test'), 'other', 'normal', 'help', 'it doesnt work'),
   t(
-    s('Kevin Park', 'kevin.park@gmail.com'),
+    s('Kevin Park', 'kevin.park@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Re: Re: Fwd: course access',
@@ -744,14 +744,14 @@ export const demoTickets: DemoTicket[] = [
     'On the final exam, the 60-minute timer shows 00:00 the moment I start and auto-submits with zero answers. This happened twice, and now it says I have no attempts left.',
   ),
   t(
-    s('Alice Moreau', 'alice.moreau@free.fr'),
+    s('Alice Moreau', 'alice.moreau@helpdesk.students.test'),
     'general_question',
     'low',
     'Can I pause my subscription?',
     'I’m going on parental leave for 3 months. Can I pause my subscription instead of cancelling?',
   ),
   t(
-    s('Ben Okonkwo', 'ben.okonkwo@gmail.com'),
+    s('Ben Okonkwo', 'ben.okonkwo@helpdesk.students.test'),
     'technical_question',
     'normal',
     'Course disappeared from my dashboard',
