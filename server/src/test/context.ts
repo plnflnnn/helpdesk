@@ -31,7 +31,7 @@ export function createTestContext() {
   });
 
   async function reset() {
-    await db.$executeRaw`TRUNCATE TABLE "users", "sessions", "accounts", "verifications" CASCADE`;
+    await db.$executeRaw`TRUNCATE TABLE "users", "sessions", "accounts", "verifications", "students", "tickets", "messages" RESTART IDENTITY CASCADE`;
   }
 
   async function createUser({

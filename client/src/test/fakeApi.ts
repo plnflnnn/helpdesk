@@ -19,13 +19,17 @@ export const agentUser: User = {
   role: Role.agent,
 };
 
-type Handler = (body: unknown) => { status: number; body?: unknown };
+/** Gets the parsed JSON request body and the query params. */
+type Handler = (
+  body: unknown,
+  params: Record<string, string>,
+) => { status: number; body?: unknown };
 
 const realAdapter = axios.defaults.adapter;
 
 /**
  * Replaces axios's HTTP adapter with handlers keyed by "METHOD /path". Unknown routes return 404.
- * Each handler gets the parsed JSON request body. Returns the jest mock so tests can inspect calls.
+ * Each handler gets the parsed JSON request body and the query params. Returns the jest mock so tests can inspect calls.
  */
 export function mockApi(routes: Record<string, Handler>) {
   const adapter = jest.fn(async (config: InternalAxiosRequestConfig): Promise<AxiosResponse> => {
@@ -34,7 +38,7 @@ export function mockApi(routes: Record<string, Handler>) {
     const requestBody: unknown =
       typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
     const { status, body } = handler
-      ? handler(requestBody)
+      ? handler(requestBody, (config.params ?? {}) as Record<string, string>)
       : { status: 404, body: { error: 'Not found' } };
     const response: AxiosResponse = {
       data: body,

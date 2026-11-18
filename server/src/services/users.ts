@@ -111,8 +111,9 @@ type DeleteUserParams = {
 };
 
 /**
- * Soft-deletes an agent: marks them deleted and inactive (so they can't sign in) and ends their
- * sessions. The row stays, so anything they worked on keeps its author. Admins can't be deleted.
+ * Soft-deletes an agent: marks them deleted and inactive (so they can't sign in), ends their
+ * sessions and returns their tickets to the unassigned queue. The row stays, so messages they
+ * sent keep their author. Admins can't be deleted.
  */
 export async function deleteUser({ db, userId }: DeleteUserParams): Promise<void> {
   const user = await findExistingUser({ db, userId });
@@ -122,6 +123,7 @@ export async function deleteUser({ db, userId }: DeleteUserParams): Promise<void
 
   await db.$transaction([
     db.session.deleteMany({ where: { userId } }),
+    db.ticket.updateMany({ where: { assigneeId: userId }, data: { assigneeId: null } }),
     db.user.update({
       where: { id: userId },
       data: { deletedAt: new Date(), active: false },

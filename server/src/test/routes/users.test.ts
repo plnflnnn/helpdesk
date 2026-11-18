@@ -242,6 +242,28 @@ describe('DELETE /api/users/:id', () => {
     expect(row).toMatchObject({ active: false, deletedAt: expect.any(Date) });
   });
 
+  it('returns the deleted agent’s tickets to the unassigned queue', async () => {
+    const { client } = await loginAdmin();
+    const agent = await ctx.createUser();
+    const otherAgent = await ctx.createUser();
+    const student = await ctx.db.student.create({ data: { email: 'student@example.com' } });
+    const ticketFor = (assigneeId: string) =>
+      ctx.db.ticket.create({ data: { subject: 'Help', studentId: student.id, assigneeId } });
+    const [first, second] = [await ticketFor(agent.id), await ticketFor(agent.id)];
+    const kept = await ticketFor(otherAgent.id);
+
+    expect((await client.delete(`/api/users/${agent.id}`)).status).toBe(204);
+
+    const tickets = await ctx.db.ticket.findMany({ select: { id: true, assigneeId: true } });
+    expect(tickets).toEqual(
+      expect.arrayContaining([
+        { id: first.id, assigneeId: null },
+        { id: second.id, assigneeId: null },
+        { id: kept.id, assigneeId: otherAgent.id },
+      ]),
+    );
+  });
+
   it('blocks a deleted user from signing in', async () => {
     const { client } = await loginAdmin();
     const agent = await ctx.createUser();
