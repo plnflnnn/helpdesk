@@ -3,10 +3,12 @@ import type { JobQueue } from '@/jobs/queue.js';
 import { createTestContext, INBOUND_EMAIL_SECRET } from '@/test/context.js';
 
 const classifyTicket = jest.fn<JobQueue['classifyTicket']>();
-const ctx = createTestContext({ jobs: { classifyTicket } });
+const autoResolveTicket = jest.fn<JobQueue['autoResolveTicket']>();
+const ctx = createTestContext({ jobs: { classifyTicket, autoResolveTicket } });
 
 beforeEach(async () => {
   classifyTicket.mockReset();
+  autoResolveTicket.mockReset();
   await ctx.reset();
 });
 afterAll(() => ctx.close());
@@ -72,7 +74,7 @@ describe('POST /webhooks/inbound', () => {
     expect(await ctx.db.ticket.count()).toBe(0);
   });
 
-  it('creates a ticket and student from a new email and queues its classification', async () => {
+  it('creates a ticket and student from a new email and queues its AI jobs', async () => {
     const response = await postEmail();
 
     expect(response.status).toBe(200);
@@ -91,6 +93,7 @@ describe('POST /webhooks/inbound', () => {
       }),
     ]);
     expect(classifyTicket).toHaveBeenCalledWith(ticket.id);
+    expect(autoResolveTicket).toHaveBeenCalledWith(ticket.id);
   });
 
   it('still saves the ticket when the job cannot be queued', async () => {
@@ -114,7 +117,7 @@ describe('POST /webhooks/inbound', () => {
     expect(classifyTicket).toHaveBeenCalledTimes(1);
   });
 
-  it('threads a reply onto its ticket by References and reopens it, without reclassifying', async () => {
+  it('threads a reply onto its ticket by References and reopens it, without new AI jobs', async () => {
     await postEmail();
     const { id } = await onlyTicket();
     await ctx.db.ticket.update({
@@ -147,6 +150,7 @@ describe('POST /webhooks/inbound', () => {
       'Got it, thanks!',
     ]);
     expect(classifyTicket).toHaveBeenCalledTimes(1);
+    expect(autoResolveTicket).toHaveBeenCalledTimes(1);
   });
 
   it('threads a reply by its support+T<id> address when the headers are missing', async () => {

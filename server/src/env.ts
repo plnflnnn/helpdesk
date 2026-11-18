@@ -21,6 +21,8 @@ const envSchema = z.object({
   SENDGRID_FROM_EMAIL: z.email().optional(),
   /** Shared secret in the Inbound Parse webhook URL. Without it, the webhook rejects every request. */
   SENDGRID_INBOUND_SECRET: z.string().min(16).optional(),
+  /** Markdown file the AI answers new tickets from; relative paths are from the server folder. */
+  KNOWLEDGE_BASE_PATH: z.string().min(1).default('knowledge-base.md'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,4 +1,5 @@
 import { MailService } from '@sendgrid/mail';
+import type { Env } from '@/env.js';
 
 export type OutgoingEmail = {
   to: string;
@@ -17,6 +18,22 @@ export type Mailer = {
   readonly from: string;
   send(email: OutgoingEmail): Promise<void>;
 };
+
+/**
+ * SendGrid when it's configured, else a mailer that only logs (development). Throws in production
+ * without SendGrid settings.
+ */
+export function createMailer(
+  env: Pick<Env, 'NODE_ENV' | 'SENDGRID_API_KEY' | 'SENDGRID_FROM_EMAIL'>,
+): Mailer {
+  if (env.SENDGRID_API_KEY && env.SENDGRID_FROM_EMAIL) {
+    return createSendGridMailer({ apiKey: env.SENDGRID_API_KEY, from: env.SENDGRID_FROM_EMAIL });
+  }
+  if (env.NODE_ENV === 'production') {
+    throw new Error('SENDGRID_API_KEY and SENDGRID_FROM_EMAIL are required in production');
+  }
+  return createConsoleMailer(env.SENDGRID_FROM_EMAIL);
+}
 
 /** Sends through the SendGrid Mail Send API. */
 export function createSendGridMailer({ apiKey, from }: { apiKey: string; from: string }): Mailer {

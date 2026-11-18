@@ -5,18 +5,12 @@ import { createPrismaClient, isDatabaseUp } from '@/db.js';
 import { parseEnv } from '@/env.js';
 import { createJobQueue, startBoss } from '@/jobs/queue.js';
 import { createAiModel } from '@/services/ai.js';
-import { createConsoleMailer, createSendGridMailer } from '@/services/email.js';
+import { createMailer } from '@/services/email.js';
 
 const env = parseEnv(process.env);
 const db = createPrismaClient(env.DATABASE_URL);
 
-if (env.NODE_ENV === 'production' && !(env.SENDGRID_API_KEY && env.SENDGRID_FROM_EMAIL)) {
-  throw new Error('SENDGRID_API_KEY and SENDGRID_FROM_EMAIL are required in production');
-}
-const mailer =
-  env.SENDGRID_API_KEY && env.SENDGRID_FROM_EMAIL
-    ? createSendGridMailer({ apiKey: env.SENDGRID_API_KEY, from: env.SENDGRID_FROM_EMAIL })
-    : createConsoleMailer(env.SENDGRID_FROM_EMAIL);
+const mailer = createMailer(env);
 
 // The web server only sends jobs; the worker (`npm run dev:worker` / `start:worker`) runs them.
 const boss = await startBoss(env.DATABASE_URL);

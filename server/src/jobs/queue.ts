@@ -2,38 +2,43 @@ import { PgBoss } from 'pg-boss';
 
 /** Queue names. */
 export const CLASSIFY_TICKET = 'classify-ticket';
+export const AUTO_RESOLVE_TICKET = 'auto-resolve-ticket';
 
-export type ClassifyTicketJob = { ticketId: number };
+/** Data of every ticket job. */
+export type TicketJob = { ticketId: number };
 
 /** Puts work on the background queue. The web server only sends jobs; the worker runs them. */
 export type JobQueue = {
   /** Queues AI classification of a new ticket. Resolves once the job is saved, not when it has run. */
   classifyTicket(ticketId: number): Promise<void>;
+  /** Queues an attempt to answer and resolve a new ticket from the knowledge base. */
+  autoResolveTicket(ticketId: number): Promise<void>;
 };
+
+/** 3 retries with increasing delays (about 5s, 10s, 20s), then the job is marked failed. */
+const retryOptions = { retryLimit: 3, retryDelay: 5, retryBackoff: true, expireInSeconds: 120 };
 
 /** Starts pg-boss (creating its `pgboss` schema on first run) and makes sure every queue exists. */
 export async function startBoss(connectionString: string) {
   const boss = new PgBoss(connectionString);
   boss.on('error', (error) => console.error('pg-boss error', error));
   await boss.start();
-  await ensureQueue(boss, CLASSIFY_TICKET, {
-    // 3 retries with increasing delays (about 5s, 10s, 20s), then the job is marked failed and the
-    // ticket stays unclassified: agents can always set the category by hand.
-    retryLimit: 3,
-    retryDelay: 5,
-    retryBackoff: true,
-    expireInSeconds: 120,
-  });
+  // When classification fails for good, the ticket stays unclassified: agents set it by hand.
+  await ensureQueue(boss, CLASSIFY_TICKET, retryOptions);
+  // When auto-resolving fails for good, the ticket simply stays open for agents.
+  await ensureQueue(boss, AUTO_RESOLVE_TICKET, retryOptions);
   return boss;
 }
 
 export function createJobQueue(boss: PgBoss): JobQueue {
+  // The singleton key stops a ticket from being queued twice while a job for it is waiting.
+  const sendTicketJob = async (queue: string, ticketId: number) => {
+    const data: TicketJob = { ticketId };
+    await boss.send(queue, data, { singletonKey: String(ticketId) });
+  };
   return {
-    async classifyTicket(ticketId) {
-      const data: ClassifyTicketJob = { ticketId };
-      // The singleton key stops a ticket from being queued twice while a job for it is waiting.
-      await boss.send(CLASSIFY_TICKET, data, { singletonKey: String(ticketId) });
-    },
+    classifyTicket: (ticketId) => sendTicketJob(CLASSIFY_TICKET, ticketId),
+    autoResolveTicket: (ticketId) => sendTicketJob(AUTO_RESOLVE_TICKET, ticketId),
   };
 }
 

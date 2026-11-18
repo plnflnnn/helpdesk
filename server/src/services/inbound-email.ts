@@ -61,7 +61,8 @@ export type ReceiveEmailResult =
 
 /**
  * Saves a student's email: as a reply on the ticket it answers, or as a new ticket. New tickets are
- * queued for AI classification, which runs later in the worker; this never waits for the AI.
+ * queued for AI classification and auto-resolving, which run later in the worker; this never waits
+ * for the AI.
  *
  * A reply reopens a pending or resolved ticket; a reply to a closed ticket starts a new one.
  * An email that was already received (same Message-ID, e.g. a webhook retry) is ignored.
@@ -111,11 +112,15 @@ export async function receiveEmail({
   });
 
   // The ticket is already saved, so a queue failure must not fail the webhook (SendGrid would
-  // retry, and the retry would be ignored as a duplicate). The agent can classify it by hand.
-  try {
-    await jobs.classifyTicket(ticket.id);
-  } catch (error) {
-    console.error(`Could not queue classification of ticket ${ticket.id}`, error);
+  // retry, and the retry would be ignored as a duplicate). Agents can still handle it by hand.
+  const queued = await Promise.allSettled([
+    jobs.classifyTicket(ticket.id),
+    jobs.autoResolveTicket(ticket.id),
+  ]);
+  for (const result of queued) {
+    if (result.status === 'rejected') {
+      console.error(`Could not queue a job for ticket ${ticket.id}`, result.reason);
+    }
   }
   return { outcome: 'created', ticketId: ticket.id };
 }

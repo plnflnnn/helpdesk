@@ -34,7 +34,7 @@ export const INBOUND_EMAIL_SECRET = 'test-inbound-secret-0123456789';
 export function createTestContext({
   aiModel,
   mailer = { from: 'support@example.com', send: async () => {} },
-  jobs = { classifyTicket: async () => {} },
+  jobs = { classifyTicket: async () => {}, autoResolveTicket: async () => {} },
 }: TestContextOptions = {}) {
   const db = createPrismaClient(testDatabaseUrl());
   const auth = createAuth(db, {

@@ -8,7 +8,7 @@ import type {
 } from '@helpdesk/shared';
 import type { Prisma } from '@generated/prisma/client.js';
 import type { Database } from '@/db.js';
-import { badGateway, badRequest, notFound } from '@/errors.js';
+import { badGateway, badRequest, HttpError, notFound } from '@/errors.js';
 import { newMessageId, ticketReplyAddress, type Mailer } from '@/services/email.js';
 
 const TICKET_NOT_FOUND = 'Ticket not found';
@@ -179,6 +179,51 @@ export async function addReply({
   author,
   bodyText,
 }: AddReplyParams): Promise<TicketDetail> {
+  let sent: SentReply;
+  try {
+    sent = await emailReply({ db, mailer, ticketId, fromName: author.name, bodyText });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    console.error(`Sending the reply on ticket ${ticketId} failed`, error);
+    throw badGateway('The reply could not be emailed to the student. Try again.');
+  }
+
+  await db.ticket.update({
+    where: { id: ticketId },
+    data: {
+      status: 'pending',
+      messages: { create: { direction: 'outbound', authorId: author.id, bodyText, ...sent } },
+    },
+  });
+  return getTicket(db, ticketId);
+}
+
+type EmailReplyParams = {
+  db: Database;
+  mailer: Mailer;
+  ticketId: number;
+  /** Sender display name: the agent's name, or the support team's for AI replies. */
+  fromName: string;
+  bodyText: string;
+};
+
+/** The threading headers of a reply that was emailed, to save on its `Message`. */
+export type SentReply = { emailMessageId: string; inReplyTo: string | null };
+
+/**
+ * Emails a reply on the ticket to its student, threaded onto the conversation (`In-Reply-To` and
+ * `References`) with a `support+T<id>@` Reply-To. Saves nothing. Throws 404 for a missing ticket,
+ * and the mailer's error when sending fails.
+ */
+export async function emailReply({
+  db,
+  mailer,
+  ticketId,
+  fromName,
+  bodyText,
+}: EmailReplyParams): Promise<SentReply> {
   const ticket = await db.ticket.findUnique({
     where: { id: ticketId },
     select: {
@@ -197,34 +242,19 @@ export async function addReply({
 
   const emailMessageId = newMessageId(mailer.from);
   const references = ticket.messages.map((message) => message.emailMessageId!);
-  const inReplyTo = references.at(-1);
-  try {
-    await mailer.send({
-      to: ticket.student.email,
-      subject: replySubject(ticket.subject),
-      text: bodyText,
-      fromName: author.name,
-      replyTo: ticketReplyAddress(mailer.from, ticketId),
-      headers: {
-        'Message-ID': emailMessageId,
-        ...(inReplyTo && { 'In-Reply-To': inReplyTo, References: references.join(' ') }),
-      },
-    });
-  } catch (error) {
-    console.error(`Sending the reply on ticket ${ticketId} failed`, error);
-    throw badGateway('The reply could not be emailed to the student. Try again.');
-  }
-
-  await db.ticket.update({
-    where: { id: ticketId },
-    data: {
-      status: 'pending',
-      messages: {
-        create: { direction: 'outbound', authorId: author.id, bodyText, emailMessageId, inReplyTo },
-      },
+  const inReplyTo = references.at(-1) ?? null;
+  await mailer.send({
+    to: ticket.student.email,
+    subject: replySubject(ticket.subject),
+    text: bodyText,
+    fromName,
+    replyTo: ticketReplyAddress(mailer.from, ticketId),
+    headers: {
+      'Message-ID': emailMessageId,
+      ...(inReplyTo && { 'In-Reply-To': inReplyTo, References: references.join(' ') }),
     },
   });
-  return getTicket(db, ticketId);
+  return { emailMessageId, inReplyTo };
 }
 
 /** `Cannot log in` → `Re: Cannot log in`, without stacking `Re: Re:`. */
