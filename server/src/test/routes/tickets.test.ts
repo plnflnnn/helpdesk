@@ -7,6 +7,7 @@ import {
   ticketResponseSchema,
   type TicketListItem,
 } from '@helpdesk/shared';
+import type { Mailer } from '@/services/email.js';
 import { createTestContext } from '@/test/context.js';
 
 type GenerateResult = Awaited<ReturnType<MockLanguageModelV4['doGenerate']>>;
@@ -24,10 +25,12 @@ const modelReply = (text: string): GenerateResult => ({
 
 const doGenerate = jest.fn<MockLanguageModelV4['doGenerate']>();
 const aiModel = new MockLanguageModelV4({ doGenerate });
-const ctx = createTestContext({ aiModel });
+const send = jest.fn<Mailer['send']>();
+const ctx = createTestContext({ aiModel, mailer: { from: 'support@example.com', send } });
 
 beforeEach(async () => {
   doGenerate.mockReset();
+  send.mockReset();
   aiModel.doGenerateCalls.length = 0;
   await ctx.reset();
 });
@@ -232,6 +235,7 @@ async function seedConversation() {
           {
             direction: 'inbound',
             bodyText: 'The password reset email never arrived.',
+            emailMessageId: '<first@mail.example.com>',
             createdAt: new Date(Date.UTC(2026, 10, 1)),
           },
           {
@@ -457,6 +461,55 @@ describe('POST /api/tickets/:id/replies', () => {
     const response = await client.post('/api/tickets/999/replies').send({ bodyText: 'Hi' });
 
     expect(response.status).toBe(404);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('emails the reply to the student, threaded onto the conversation', async () => {
+    const { ticket } = await seedConversation();
+    const replier = await ctx.createUser();
+    const client = await ctx.loginAs(replier.email);
+
+    await client.post(`/api/tickets/${ticket.id}/replies`).send({ bodyText: 'Try again now.' });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const email = send.mock.calls[0]![0];
+    expect(email).toMatchObject({
+      to: 'mia@example.com',
+      subject: 'Re: Cannot log in',
+      text: 'Try again now.',
+      fromName: replier.name,
+      replyTo: `support+T${ticket.id}@example.com`,
+      headers: {
+        'In-Reply-To': '<first@mail.example.com>',
+        References: '<first@mail.example.com>',
+      },
+    });
+    expect(email.headers!['Message-ID']).toMatch(/^<[\w-]+@example\.com>$/);
+    const saved = await ctx.db.message.findFirstOrThrow({
+      where: { ticketId: ticket.id, direction: 'outbound', bodyText: 'Try again now.' },
+    });
+    expect(saved).toMatchObject({
+      emailMessageId: email.headers!['Message-ID'],
+      inReplyTo: '<first@mail.example.com>',
+    });
+  });
+
+  it('responds 502 and saves nothing when the email cannot be sent', async () => {
+    const { ticket } = await seedConversation();
+    const client = await signedInAgent();
+    send.mockRejectedValue(new Error('SendGrid is down'));
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await client
+      .post(`/api/tickets/${ticket.id}/replies`)
+      .send({ bodyText: 'Hi' });
+
+    consoleError.mockRestore();
+    expect(response.status).toBe(502);
+    expect(await ctx.db.message.count({ where: { ticketId: ticket.id } })).toBe(2);
+    expect((await ctx.db.ticket.findUniqueOrThrow({ where: { id: ticket.id } })).status).toBe(
+      'open',
+    );
   });
 
   it.each([

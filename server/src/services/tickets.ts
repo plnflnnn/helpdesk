@@ -8,7 +8,8 @@ import type {
 } from '@helpdesk/shared';
 import type { Prisma } from '@generated/prisma/client.js';
 import type { Database } from '@/db.js';
-import { badRequest, notFound } from '@/errors.js';
+import { badGateway, badRequest, notFound } from '@/errors.js';
+import { newMessageId, ticketReplyAddress, type Mailer } from '@/services/email.js';
 
 const TICKET_NOT_FOUND = 'Ticket not found';
 const ASSIGNEE_NOT_FOUND = 'This agent does not exist or is inactive';
@@ -160,37 +161,75 @@ export async function updateTicket({
 
 type AddReplyParams = {
   db: Database;
+  mailer: Mailer;
   ticketId: number;
-  authorId: string;
+  author: { id: string; name: string };
   bodyText: string;
 };
 
 /**
- * Saves an agent's reply on the ticket and sets the ticket to pending (waiting on the student).
- * Replies aren't emailed yet.
+ * Emails an agent's reply to the student, threaded onto the conversation, then saves it on the
+ * ticket and sets the ticket to pending (waiting on the student). Responds 502 and saves nothing
+ * when the email can't be sent.
  */
 export async function addReply({
   db,
+  mailer,
   ticketId,
-  authorId,
+  author,
   bodyText,
 }: AddReplyParams): Promise<TicketDetail> {
   const ticket = await db.ticket.findUnique({
     where: { id: ticketId },
-    select: { id: true },
+    select: {
+      subject: true,
+      student: { select: { email: true } },
+      messages: {
+        where: { emailMessageId: { not: null } },
+        select: { emailMessageId: true },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      },
+    },
   });
   if (!ticket) {
     throw notFound(TICKET_NOT_FOUND);
+  }
+
+  const emailMessageId = newMessageId(mailer.from);
+  const references = ticket.messages.map((message) => message.emailMessageId!);
+  const inReplyTo = references.at(-1);
+  try {
+    await mailer.send({
+      to: ticket.student.email,
+      subject: replySubject(ticket.subject),
+      text: bodyText,
+      fromName: author.name,
+      replyTo: ticketReplyAddress(mailer.from, ticketId),
+      headers: {
+        'Message-ID': emailMessageId,
+        ...(inReplyTo && { 'In-Reply-To': inReplyTo, References: references.join(' ') }),
+      },
+    });
+  } catch (error) {
+    console.error(`Sending the reply on ticket ${ticketId} failed`, error);
+    throw badGateway('The reply could not be emailed to the student. Try again.');
   }
 
   await db.ticket.update({
     where: { id: ticketId },
     data: {
       status: 'pending',
-      messages: { create: { direction: 'outbound', authorId, bodyText } },
+      messages: {
+        create: { direction: 'outbound', authorId: author.id, bodyText, emailMessageId, inReplyTo },
+      },
     },
   });
   return getTicket(db, ticketId);
+}
+
+/** `Cannot log in` → `Re: Cannot log in`, without stacking `Re: Re:`. */
+function replySubject(subject: string) {
+  return /^re:/i.test(subject) ? subject : `Re: ${subject}`;
 }
 
 /** Active users that aren't deleted, by name: everyone a ticket can be assigned to. */

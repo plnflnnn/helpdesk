@@ -3,6 +3,7 @@ import type { Role } from '@helpdesk/shared';
 import type { Auth } from '@/auth.js';
 import type { Database } from '@/db.js';
 import type { Env } from '@/env.js';
+import type { Mailer } from '@/services/email.js';
 
 /** Services the API routes need. */
 export type Services = {
@@ -10,6 +11,8 @@ export type Services = {
   auth: Auth;
   /** Model for AI features (reply polishing, ticket summaries); unset when no OpenAI key is configured. */
   aiModel?: LanguageModel;
+  /** Sends email to students. */
+  mailer: Mailer;
 };
 
 export type AppDependencies = {

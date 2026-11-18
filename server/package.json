@@ -20,6 +20,7 @@
     "@helpdesk/shared": "^0.0.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "@sendgrid/mail": "^8.1.6",
     "ai": "^7.0.176",
     "better-auth": "^1.7.25",
     "dotenv": "^18.0.10",

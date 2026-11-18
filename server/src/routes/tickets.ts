@@ -24,7 +24,7 @@ import { summarizeTicket } from '@/services/ticket-summary.js';
 import type { Services } from '@/types.js';
 
 /** Tickets, available to every signed-in agent and admin. */
-export function ticketsRouter({ db, auth, aiModel }: Services) {
+export function ticketsRouter({ db, auth, aiModel, mailer }: Services) {
   const router = Router();
   router.use(requireAuth(auth));
 
@@ -60,8 +60,9 @@ export function ticketsRouter({ db, auth, aiModel }: Services) {
     async (req, res) => {
       const ticket = await addReply({
         db,
+        mailer,
         ticketId: req.params.id,
-        authorId: req.user!.id,
+        author: req.user!,
         bodyText: req.body.bodyText,
       });
       const body: TicketResponse = { ticket };

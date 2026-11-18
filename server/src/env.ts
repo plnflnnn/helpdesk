@@ -15,6 +15,10 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   /** OpenAI model used for AI features. */
   OPENAI_MODEL: z.string().min(1).default('gpt-5.4-mini'),
+  /** SendGrid key for outbound email. Without it (or the from address), emails are logged instead of sent. */
+  SENDGRID_API_KEY: z.string().min(1).optional(),
+  /** The support address emails are sent from; must be a verified sender in SendGrid. */
+  SENDGRID_FROM_EMAIL: z.email().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

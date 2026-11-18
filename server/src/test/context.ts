@@ -6,6 +6,7 @@ import { Role } from '@helpdesk/shared';
 import { createApp } from '@/app.js';
 import { createAuth } from '@/auth.js';
 import { createPrismaClient } from '@/db.js';
+import type { Mailer } from '@/services/email.js';
 import { testDatabaseUrl } from '@/test/database-url.js';
 
 export const APP_URL = 'http://localhost:3000';
@@ -20,10 +21,15 @@ type CreateTestUserOptions = {
 type TestContextOptions = {
   /** Model for AI features; use a `MockLanguageModelV4` from `ai/test`. */
   aiModel?: LanguageModel;
+  /** Defaults to one that accepts every email and sends nothing. */
+  mailer?: Mailer;
 };
 
 /** A real app wired to the test database. Call `reset()` before each test and `close()` after all. */
-export function createTestContext({ aiModel }: TestContextOptions = {}) {
+export function createTestContext({
+  aiModel,
+  mailer = { from: 'support@example.com', send: async () => {} },
+}: TestContextOptions = {}) {
   const db = createPrismaClient(testDatabaseUrl());
   const auth = createAuth(db, {
     NODE_ENV: 'test',
@@ -33,7 +39,7 @@ export function createTestContext({ aiModel }: TestContextOptions = {}) {
   });
   const app = createApp({
     checkDatabase: async () => true,
-    services: { db, auth, aiModel },
+    services: { db, auth, aiModel, mailer },
   });
 
   async function reset() {
