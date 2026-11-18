@@ -93,7 +93,7 @@ export async function receiveEmail({
   if (thread && thread.status !== 'closed') {
     await db.ticket.update({
       where: { id: thread.id },
-      data: { status: 'open', messages: { create: message } },
+      data: { status: 'open', resolvedAt: null, messages: { create: message } },
     });
     return { outcome: 'threaded', ticketId: thread.id };
   }

@@ -108,6 +108,7 @@ ${formatConversation(ticket)}
       where: { id: ticketId },
       data: {
         status: 'resolved',
+        resolvedAt: new Date(),
         messages: { create: { direction: 'outbound', bodyText: reply, ...sent } },
       },
     });

@@ -57,7 +57,7 @@ describe('tickets page', () => {
   it('lists tickets with their details', async () => {
     mockTicketsApi();
 
-    renderApp('/');
+    renderApp('/tickets');
 
     expect(await screen.findByText(loginTicket.subject)).toBeInTheDocument();
     expect(screen.getByText('Emma Thompson')).toBeInTheDocument();
@@ -76,7 +76,7 @@ describe('tickets page', () => {
   it('asks the server for newest tickets first by default', async () => {
     const requests = mockTicketsApi();
 
-    renderApp('/');
+    renderApp('/tickets');
 
     await screen.findByText(loginTicket.subject);
     expect(requests[0]).toEqual({ ...firstPage, sortBy: 'createdAt', sortOrder: 'desc' });
@@ -88,7 +88,7 @@ describe('tickets page', () => {
 
   it('sorts on the server when a column header is clicked, toggling the direction', async () => {
     const requests = mockTicketsApi();
-    renderApp('/');
+    renderApp('/tickets');
     await screen.findByText(loginTicket.subject);
 
     fireEvent.click(screen.getByRole('button', { name: /Subject/ }));
@@ -113,7 +113,7 @@ describe('tickets page', () => {
 
   it('starts the Created column descending', async () => {
     const requests = mockTicketsApi();
-    renderApp('/?sortBy=subject&sortOrder=asc');
+    renderApp('/tickets?sortBy=subject&sortOrder=asc');
     await screen.findByText(loginTicket.subject);
 
     fireEvent.click(screen.getByRole('button', { name: /Created/ }));
@@ -126,7 +126,7 @@ describe('tickets page', () => {
   it('reads the sort from the URL', async () => {
     const requests = mockTicketsApi();
 
-    renderApp('/?sortBy=student&sortOrder=asc&status=open&search=refund');
+    renderApp('/tickets?sortBy=student&sortOrder=asc&status=open&search=refund');
 
     await screen.findByText(loginTicket.subject);
     expect(requests[0]).toEqual({
@@ -141,7 +141,7 @@ describe('tickets page', () => {
 
   it('searches on the server once typing pauses', async () => {
     const requests = mockTicketsApi();
-    renderApp('/');
+    renderApp('/tickets');
     await screen.findByText(loginTicket.subject);
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search tickets' }), {
@@ -164,7 +164,7 @@ describe('tickets page', () => {
     ['Category', 'Refund Request', { category: 'refund_request' }],
   ])('filters by %s', async (filter, option, params) => {
     const requests = mockTicketsApi();
-    renderApp('/');
+    renderApp('/tickets');
     await screen.findByText(loginTicket.subject);
 
     fireEvent.click(screen.getByRole('combobox', { name: filter }));
@@ -193,7 +193,7 @@ describe('tickets page', () => {
         return { status: 200, body: { tickets, total: tickets.length } };
       },
     });
-    renderApp('/?status=closed&search=zzz');
+    renderApp('/tickets?status=closed&search=zzz');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Clear filters' }));
 
@@ -228,7 +228,7 @@ describe('tickets page', () => {
 
     it('shows the first page with a summary and moves between pages', async () => {
       const requests = mockManyTicketsApi();
-      renderApp('/');
+      renderApp('/tickets');
 
       expect(await screen.findByText('Ticket 1')).toBeInTheDocument();
       expect(nav()).toHaveTextContent('Showing 1–25 of 60');
@@ -255,7 +255,7 @@ describe('tickets page', () => {
     it('reads the page from the URL', async () => {
       const requests = mockManyTicketsApi();
 
-      renderApp('/?page=2');
+      renderApp('/tickets?page=2');
 
       expect(await screen.findByText('Ticket 26')).toBeInTheDocument();
       expect(requests[0]).toMatchObject({ page: 2 });
@@ -263,7 +263,7 @@ describe('tickets page', () => {
 
     it('goes back to the first page when the sort changes', async () => {
       const requests = mockManyTicketsApi();
-      renderApp('/?page=2');
+      renderApp('/tickets?page=2');
       await screen.findByText('Ticket 26');
 
       fireEvent.click(screen.getByRole('button', { name: /Subject/ }));
@@ -276,7 +276,7 @@ describe('tickets page', () => {
     it('shows the last page when the URL asks for a page past the end', async () => {
       const requests = mockManyTicketsApi();
 
-      renderApp('/?page=9');
+      renderApp('/tickets?page=9');
 
       expect(await screen.findByText('Ticket 51')).toBeInTheDocument();
       expect(requests.at(-1)).toMatchObject({ page: 3 });
@@ -289,7 +289,7 @@ describe('tickets page', () => {
       'GET /api/tickets': () => ({ status: 200, body: { tickets: [], total: 0 } }),
     });
 
-    renderApp('/');
+    renderApp('/tickets');
 
     expect(await screen.findByText(/No tickets yet/)).toBeInTheDocument();
   });

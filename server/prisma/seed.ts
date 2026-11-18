@@ -137,6 +137,8 @@ async function seedDemoData(db: Database, env: SeedEnv, adminId: string) {
         priority: ticket.priority,
         createdAt,
         updatedAt,
+        resolvedAt:
+          status === TicketStatus.resolved || status === TicketStatus.closed ? updatedAt : null,
         student: {
           connectOrCreate: {
             where: { email: ticket.student.email },

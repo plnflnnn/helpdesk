@@ -16,7 +16,7 @@ const formatDate = (iso: string) => dateFormat.format(new Date(iso));
 function BackLink() {
   return (
     <Link
-      to="/"
+      to="/tickets"
       className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
     >
       <ArrowLeftIcon className="size-4" aria-hidden />

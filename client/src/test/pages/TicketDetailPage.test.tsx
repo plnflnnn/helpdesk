@@ -100,7 +100,7 @@ async function choose(field: string, option: string) {
 describe('ticket detail page', () => {
   it('opens from the subject link on the ticket list', async () => {
     mockTicketApi();
-    renderApp('/');
+    renderApp('/tickets');
 
     fireEvent.click(await screen.findByRole('link', { name: ticket.subject }));
 

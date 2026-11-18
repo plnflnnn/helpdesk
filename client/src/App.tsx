@@ -5,6 +5,7 @@ import { Role } from '@helpdesk/shared';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { createQueryClient } from '@/lib/queryClient';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { TicketDetailPage } from '@/pages/TicketDetailPage';
@@ -22,7 +23,8 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<TicketsPage />} />
+        <Route index element={<DashboardPage />} />
+        <Route path="tickets" element={<TicketsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route
           path="users"

@@ -138,7 +138,10 @@ type UpdateTicketParams = {
   data: UpdateTicketInput;
 };
 
-/** Changes the ticket's status, category or assignee. Only active users can be assigned. */
+/**
+ * Changes the ticket's status, category or assignee. Only active users can be assigned.
+ * Resolving (or closing) records when the ticket was resolved; reopening clears it.
+ */
 export async function updateTicket({
   db,
   ticketId,
@@ -149,10 +152,24 @@ export async function updateTicket({
     await assertAssignable(db, assigneeId);
   }
 
-  const { count } = await db.ticket.updateMany({
-    where: { id: ticketId },
-    data: { ...fields, assigneeId },
-  });
+  const { status } = fields;
+  const reopened = status === 'open' || status === 'pending';
+  const resolved = status === 'resolved' || status === 'closed';
+  const [{ count }] = await db.$transaction([
+    db.ticket.updateMany({
+      where: { id: ticketId },
+      data: { ...fields, assigneeId, ...(reopened && { resolvedAt: null }) },
+    }),
+    // Only a ticket that wasn't resolved yet gets the current time (closing keeps it).
+    ...(resolved
+      ? [
+          db.ticket.updateMany({
+            where: { id: ticketId, resolvedAt: null },
+            data: { resolvedAt: new Date() },
+          }),
+        ]
+      : []),
+  ]);
   if (count === 0) {
     throw notFound(TICKET_NOT_FOUND);
   }
@@ -194,6 +211,7 @@ export async function addReply({
     where: { id: ticketId },
     data: {
       status: 'pending',
+      resolvedAt: null,
       messages: { create: { direction: 'outbound', authorId: author.id, bodyText, ...sent } },
     },
   });

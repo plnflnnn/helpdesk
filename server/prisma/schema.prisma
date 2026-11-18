@@ -159,6 +159,9 @@ model Ticket {
   assignee   User?          @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
+  /// When the ticket was last resolved; null while it is open or pending. Kept when a resolved
+  /// ticket is closed. Used for the average resolution time.
+  resolvedAt DateTime?
   messages   Message[]
 
   @@index([studentId])

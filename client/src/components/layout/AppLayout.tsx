@@ -1,4 +1,11 @@
-import { InboxIcon, LifeBuoyIcon, LogOutIcon, UsersIcon, type LucideIcon } from 'lucide-react';
+import {
+  InboxIcon,
+  LayoutDashboardIcon,
+  LifeBuoyIcon,
+  LogOutIcon,
+  UsersIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 import { Role } from '@helpdesk/shared';
 import { useCurrentUser, useLogout } from '@/auth/useAuth';
@@ -15,7 +22,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Tickets', icon: InboxIcon },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboardIcon },
+  { to: '/tickets', label: 'Tickets', icon: InboxIcon },
   { to: '/users', label: 'Users', icon: UsersIcon, role: Role.admin },
 ];
 

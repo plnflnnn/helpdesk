@@ -34,7 +34,7 @@ describe('authentication', () => {
 
     fillLogin('alan@example.com', 'secret-password');
 
-    expect(await screen.findByRole('heading', { name: 'Tickets' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByText('Alan Agent')).toBeInTheDocument();
     expect(requestBody(api, '/api/auth/sign-in/email')).toEqual({
       email: 'alan@example.com',
@@ -91,7 +91,8 @@ describe('role-based navigation', () => {
     renderApp('/');
 
     const nav = await screen.findByRole('navigation', { name: 'Main' });
-    expect(within(nav).getByRole('link', { name: 'Tickets' })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/');
+    expect(within(nav).getByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/tickets');
     expect(within(nav).queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
   });
 
@@ -100,7 +101,7 @@ describe('role-based navigation', () => {
 
     renderApp('/users');
 
-    expect(await screen.findByRole('heading', { name: 'Tickets' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   });
 
   it('shows the Users page to admins', async () => {

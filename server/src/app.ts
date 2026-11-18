@@ -4,6 +4,7 @@ import { toNodeHandler } from 'better-auth/node';
 import type { UserResponse } from '@helpdesk/shared';
 import { requireAuth } from '@/middleware/auth.js';
 import { apiNotFound, errorHandler } from '@/middleware/error-handler.js';
+import { dashboardRouter } from '@/routes/dashboard.js';
 import { healthRouter } from '@/routes/health.js';
 import { ticketsRouter } from '@/routes/tickets.js';
 import { usersRouter } from '@/routes/users.js';
@@ -30,6 +31,7 @@ export function createApp({ checkDatabase, services, clientDistPath }: AppDepend
     });
     app.use('/api/users', usersRouter(services));
     app.use('/api/tickets', ticketsRouter(services));
+    app.use('/api/dashboard', dashboardRouter(services));
   }
 
   app.use('/api', apiNotFound);
