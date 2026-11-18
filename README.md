@@ -64,6 +64,16 @@ npx playwright install chromium
 
 Then run `npm run dev` and open http://localhost:3000.
 
+## Live demo
+
+Try it at https://helpdesk-v0j3.onrender.com with the guest agent account:
+
+| Email                       | Password          |
+| --------------------------- | ----------------- |
+| `guestagent@helpdesk.test`  | `5zgRrH4Da3Yi7HX` |
+
+The account is shared, so you may see other visitors' changes.
+
 ## Demo accounts
 
 Outside production, `npm run db:seed` creates 100 demo tickets and four demo agents:
