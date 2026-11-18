@@ -23,6 +23,11 @@ export async function updateUser(id: string, input: UpdateUserInput) {
   return userResponseSchema.parse(data).user;
 }
 
+/** Soft-deletes the user. Admins can't be deleted. */
+export async function deleteUser(id: string) {
+  await axios.delete(`/api/users/${encodeURIComponent(id)}`);
+}
+
 export function setUserActive(id: string, active: boolean) {
   return updateUser(id, { active });
 }

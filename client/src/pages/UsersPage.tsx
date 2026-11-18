@@ -6,6 +6,7 @@ import { listUsers, usersQueryKey } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DeactivateDialog } from '@/components/users/DeactivateDialog';
+import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
 import { UserFormDialog } from '@/components/users/UserFormDialog';
 import { UserRow } from '@/components/users/UserRow';
 
@@ -14,6 +15,7 @@ export function UsersPage() {
   // `user` is kept after closing so the dialog doesn't flip from "Edit" to "Add" while it animates out.
   const [form, setForm] = useState<{ open: boolean; user?: User }>({ open: false });
   const [toDeactivate, setToDeactivate] = useState<User | null>(null);
+  const [toDelete, setToDelete] = useState<User | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,9 +42,7 @@ export function UsersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="pr-4 text-right">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
+                <TableHead className="pr-4">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -52,6 +52,7 @@ export function UsersPage() {
                   user={user}
                   onEdit={() => setForm({ open: true, user })}
                   onDeactivate={() => setToDeactivate(user)}
+                  onDelete={() => setToDelete(user)}
                 />
               ))}
             </TableBody>
@@ -65,6 +66,7 @@ export function UsersPage() {
         onOpenChange={(open) => setForm((prev) => ({ ...prev, open }))}
       />
       <DeactivateDialog user={toDeactivate} onClose={() => setToDeactivate(null)} />
+      <DeleteUserDialog user={toDelete} onClose={() => setToDelete(null)} />
     </div>
   );
 }

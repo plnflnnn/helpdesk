@@ -12,12 +12,12 @@ import {
 import { badRequest } from '@/errors.js';
 import { requireAuth, requireRole } from '@/middleware/auth.js';
 import { validate } from '@/middleware/validate.js';
-import { createUser, listUsers, updateUser } from '@/services/users.js';
+import { createUser, deleteUser, listUsers, updateUser } from '@/services/users.js';
 import type { Services } from '@/types.js';
 
 const userIdParamsSchema = z.object({ id: z.string().min(1) });
 
-/** Admin-only user management: list, create and update users. */
+/** Admin-only user management: list, create, update and (soft) delete users. */
 export function usersRouter({ db, auth }: Services) {
   const router = Router();
   router.use(requireAuth(auth), requireRole(Role.admin));
@@ -43,6 +43,11 @@ export function usersRouter({ db, auth }: Services) {
       res.json(body);
     },
   );
+
+  router.delete('/:id', validate({ params: userIdParamsSchema }), async (req, res) => {
+    await deleteUser({ db, userId: req.params.id });
+    res.status(204).end();
+  });
 
   return router;
 }

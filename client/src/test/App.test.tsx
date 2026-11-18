@@ -186,3 +186,47 @@ describe('editing users', () => {
     expect(requestBody(api, `/api/users/${agentUser.id}`)).toBeUndefined();
   });
 });
+
+describe('deleting users', () => {
+  it('asks for confirmation, then deletes the user', async () => {
+    let deleted = false;
+    const api = mockApi({
+      'GET /api/me': () => ({ status: 200, body: { user: adminUser } }),
+      'GET /api/users': () => ({
+        status: 200,
+        body: { users: deleted ? [adminUser] : [adminUser, agentUser] },
+      }),
+      [`DELETE /api/users/${agentUser.id}`]: () => {
+        deleted = true;
+        return { status: 204 };
+      },
+    });
+    renderApp('/users');
+
+    fireEvent.click(await screen.findByRole('button', { name: `Delete ${agentUser.name}` }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(`Delete ${agentUser.name}?`)).toBeInTheDocument();
+    expect(deleted).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(screen.queryByText(agentUser.email)).not.toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.mock.calls.some(([config]) => config.method === 'delete')).toBe(true);
+  });
+
+  it('does not offer to delete admins', async () => {
+    mockApi({
+      'GET /api/me': () => ({ status: 200, body: { user: adminUser } }),
+      'GET /api/users': () => ({ status: 200, body: { users: [adminUser, agentUser] } }),
+    });
+    renderApp('/users');
+
+    expect(
+      await screen.findByRole('button', { name: `Delete ${agentUser.name}` }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: `Delete ${adminUser.name}` }),
+    ).not.toBeInTheDocument();
+  });
+});

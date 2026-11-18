@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { hashPassword } from 'better-auth/crypto';
-import type { CreateUserData, UpdateUserInput, User } from '@helpdesk/shared';
+import { Role, type CreateUserData, type UpdateUserInput, type User } from '@helpdesk/shared';
 import type { Database } from '@/db.js';
-import { conflict, notFound } from '@/errors.js';
+import { conflict, forbidden, notFound } from '@/errors.js';
 import type { UserRecord } from '@/types.js';
 
 const EMAIL_TAKEN = 'A user with this email already exists';
 const USER_NOT_FOUND = 'User not found';
+const ADMIN_NOT_DELETABLE = 'Admins cannot be deleted';
 
 /** The columns needed to build a `User`. */
 const userSelect = {
@@ -29,9 +30,10 @@ export function toUser(record: UserRecord): User {
   };
 }
 
-/** Active users first, then by name. */
+/** Users that aren't deleted: active ones first, then by name. */
 export async function listUsers(db: Database): Promise<User[]> {
   const users = await db.user.findMany({
+    where: { deletedAt: null },
     select: userSelect,
     orderBy: [{ active: 'desc' }, { name: 'asc' }],
   });
@@ -74,13 +76,7 @@ type UpdateUserParams = {
 };
 
 export async function updateUser({ db, userId, data }: UpdateUserParams): Promise<User> {
-  const existing = await db.user.findUnique({
-    where: { id: userId },
-    select: { id: true },
-  });
-  if (!existing) {
-    throw notFound(USER_NOT_FOUND);
-  }
+  await findExistingUser({ db, userId });
   if (data.email) {
     await assertEmailAvailable({ db, email: data.email, exceptUserId: userId });
   }
@@ -107,6 +103,47 @@ export async function updateUser({ db, userId, data }: UpdateUserParams): Promis
     });
   });
   return toUser(user);
+}
+
+type DeleteUserParams = {
+  db: Database;
+  userId: string;
+};
+
+/**
+ * Soft-deletes an agent: marks them deleted and inactive (so they can't sign in) and ends their
+ * sessions. The row stays, so anything they worked on keeps its author. Admins can't be deleted.
+ */
+export async function deleteUser({ db, userId }: DeleteUserParams): Promise<void> {
+  const user = await findExistingUser({ db, userId });
+  if (user.role === Role.admin) {
+    throw forbidden(ADMIN_NOT_DELETABLE);
+  }
+
+  await db.$transaction([
+    db.session.deleteMany({ where: { userId } }),
+    db.user.update({
+      where: { id: userId },
+      data: { deletedAt: new Date(), active: false },
+    }),
+  ]);
+}
+
+type FindExistingUserParams = {
+  db: Database;
+  userId: string;
+};
+
+/** The user with this id, unless they don't exist or were deleted (404). */
+async function findExistingUser({ db, userId }: FindExistingUserParams) {
+  const user = await db.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { id: true, role: true },
+  });
+  if (!user) {
+    throw notFound(USER_NOT_FOUND);
+  }
+  return user;
 }
 
 type AssertEmailAvailableParams = {

@@ -29,6 +29,7 @@ describe('role checks', () => {
     expect((await client.get('/api/users')).status).toBe(403);
     expect((await client.post('/api/users').send(newUser)).status).toBe(403);
     expect((await client.patch(`/api/users/${agent.id}`).send({ active: false })).status).toBe(403);
+    expect((await client.delete(`/api/users/${agent.id}`)).status).toBe(403);
   });
 
   it('lets admins list users', async () => {
@@ -222,5 +223,57 @@ describe('deactivation', () => {
 
     expect(response.status).toBe(400);
     expect((await client.get('/api/me')).status).toBe(200);
+  });
+});
+
+describe('DELETE /api/users/:id', () => {
+  it('soft-deletes an agent: hidden from the list, signed out, and kept in the database', async () => {
+    const { admin, client } = await loginAdmin();
+    const agent = await ctx.createUser();
+    const agentClient = await ctx.loginAs(agent.email);
+
+    const response = await client.delete(`/api/users/${agent.id}`);
+
+    expect(response.status).toBe(204);
+    const { users } = listUsersResponseSchema.parse((await client.get('/api/users')).body);
+    expect(users.map((u) => u.id)).toEqual([admin.id]);
+    expect((await agentClient.get('/api/me')).status).toBe(401);
+    const row = await ctx.db.user.findUnique({ where: { id: agent.id } });
+    expect(row).toMatchObject({ active: false, deletedAt: expect.any(Date) });
+  });
+
+  it('blocks a deleted user from signing in', async () => {
+    const { client } = await loginAdmin();
+    const agent = await ctx.createUser();
+    await client.delete(`/api/users/${agent.id}`);
+
+    const response = await ctx
+      .client()
+      .post('/api/auth/sign-in/email')
+      .send({ email: agent.email, password: PASSWORD });
+
+    expect(response.status).toBe(403);
+  });
+
+  it('does not delete admins, including yourself', async () => {
+    const { admin, client } = await loginAdmin();
+    const otherAdmin = await ctx.createUser({ role: Role.admin });
+
+    for (const id of [admin.id, otherAdmin.id]) {
+      const response = await client.delete(`/api/users/${id}`);
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ error: 'Admins cannot be deleted' });
+    }
+    expect(await ctx.db.user.count({ where: { deletedAt: { not: null } } })).toBe(0);
+  });
+
+  it('returns 404 for unknown or already deleted users, and they cannot be edited', async () => {
+    const { client } = await loginAdmin();
+    const agent = await ctx.createUser();
+    await client.delete(`/api/users/${agent.id}`);
+
+    expect((await client.delete(`/api/users/${agent.id}`)).status).toBe(404);
+    expect((await client.delete('/api/users/no-such-user')).status).toBe(404);
+    expect((await client.patch(`/api/users/${agent.id}`).send({ active: true })).status).toBe(404);
   });
 });

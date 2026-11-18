@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PencilIcon } from 'lucide-react';
-import type { User } from '@helpdesk/shared';
+import { PencilIcon, Trash2Icon } from 'lucide-react';
+import { Role, type User } from '@helpdesk/shared';
 import { setUserActive, usersQueryKey } from '@/api/users';
 import { useCurrentUser } from '@/auth/useAuth';
 import { Badge } from '@/components/ui/badge';
@@ -11,9 +11,10 @@ type UserRowProps = {
   user: User;
   onEdit: () => void;
   onDeactivate: () => void;
+  onDelete: () => void;
 };
 
-export function UserRow({ user, onEdit, onDeactivate }: UserRowProps) {
+export function UserRow({ user, onEdit, onDeactivate, onDelete }: UserRowProps) {
   const { data: currentUser } = useCurrentUser();
   const queryClient = useQueryClient();
   const reactivate = useMutation({
@@ -37,11 +38,21 @@ export function UserRow({ user, onEdit, onDeactivate }: UserRowProps) {
           <Badge variant="outline">Deactivated</Badge>
         )}
       </TableCell>
-      <TableCell className="pr-4 text-right">
-        <div className="flex items-center justify-end gap-1">
+      <TableCell className="pr-4">
+        <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon-sm" aria-label={`Edit ${user.name}`} onClick={onEdit}>
             <PencilIcon aria-hidden />
           </Button>
+          {user.role !== Role.admin && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Delete ${user.name}`}
+              onClick={onDelete}
+            >
+              <Trash2Icon aria-hidden />
+            </Button>
+          )}
           {user.active ? (
             !isSelf && (
               <Button variant="ghost" size="sm" onClick={onDeactivate}>
