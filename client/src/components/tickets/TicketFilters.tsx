@@ -64,8 +64,8 @@ export function TicketFilters({ search = '', status, category, onChange }: Ticke
   }, [searchText, search, onChange]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="relative w-full sm:w-72">
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+      <div className="relative col-span-2 sm:w-80">
         <SearchIcon
           className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden
@@ -74,7 +74,7 @@ export function TicketFilters({ search = '', status, category, onChange }: Ticke
           type="search"
           aria-label="Search tickets"
           placeholder="Search subject, message or sender…"
-          className="pl-8"
+          className="h-9 bg-card pl-8"
           maxLength={TICKET_SEARCH_MAX_LENGTH}
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
@@ -86,7 +86,7 @@ export function TicketFilters({ search = '', status, category, onChange }: Ticke
         value={status ?? ALL}
         onValueChange={(value) => onChange({ status: ticketStatusSchema.safeParse(value).data })}
       >
-        <SelectTrigger aria-label="Status" className="w-40">
+        <SelectTrigger aria-label="Status" className="w-full bg-card sm:w-40">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -105,7 +105,7 @@ export function TicketFilters({ search = '', status, category, onChange }: Ticke
           onChange({ category: ticketCategorySchema.safeParse(value).data })
         }
       >
-        <SelectTrigger aria-label="Category" className="w-48">
+        <SelectTrigger aria-label="Category" className="w-full bg-card sm:w-48">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

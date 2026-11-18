@@ -2,9 +2,12 @@ import { BotIcon, CheckCircle2Icon, InboxIcon, PercentIcon, TimerIcon } from 'lu
 import { useQuery } from '@tanstack/react-query';
 import { DASHBOARD_DAYS } from '@helpdesk/shared';
 import { dashboardQueryKey, getDashboardStats } from '@/api/dashboard';
-import { StatTile } from '@/components/dashboard/StatTile';
+import { useCurrentUser } from '@/auth/useAuth';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { StatStrip, StatStripSkeleton, StatTile } from '@/components/dashboard/StatTile';
 import { TicketsPerDayChart } from '@/components/dashboard/TicketsPerDayChart';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 
 const numberFormat = new Intl.NumberFormat();
 const percentFormat = new Intl.NumberFormat(undefined, {
@@ -30,24 +33,56 @@ export function formatDuration(seconds: number) {
   }).format(value / size);
 }
 
+/** "Good morning, Alan." by the viewer's clock. */
+function greeting(name: string) {
+  const hour = new Date().getHours();
+  const part = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  return `Good ${part}, ${name.split(/\s+/)[0]}.`;
+}
+
 export function DashboardPage() {
   const stats = useQuery({ queryKey: dashboardQueryKey, queryFn: getDashboardStats });
+  const { data: user } = useCurrentUser();
+  const open = stats.data?.openTickets;
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title="Dashboard"
+        description={
+          <>
+            {user && `${greeting(user.name)} `}
+            {open === undefined ? null : open === 0 ? (
+              'Every ticket has been picked up.'
+            ) : (
+              <>
+                <span className="highlighter font-medium text-foreground">
+                  {numberFormat.format(open)} {open === 1 ? 'ticket is' : 'tickets are'} waiting
+                </span>{' '}
+                for an agent.
+              </>
+            )}
+          </>
+        }
+      />
 
-      {stats.isPending && <p className="text-sm text-muted-foreground">Loading metrics…</p>}
+      {stats.isPending && (
+        <SkeletonRegion label="Loading metrics…" className="flex flex-col gap-8">
+          <StatStripSkeleton />
+          <div className="flex flex-col gap-4 rounded-lg border bg-card p-5">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-60 w-full" />
+          </div>
+        </SkeletonRegion>
+      )}
       {stats.isError && (
         <p className="text-sm text-destructive">Could not load metrics: {stats.error.message}</p>
       )}
 
       {stats.data && (
         <>
-          <section
-            aria-label="Ticket metrics"
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-          >
+          <StatStrip label="Ticket metrics">
             <StatTile
               label="Total tickets"
               value={numberFormat.format(stats.data.totalTickets)}
@@ -83,11 +118,13 @@ export function DashboardPage() {
               detail="From first email to resolved"
               icon={TimerIcon}
             />
-          </section>
+          </StatStrip>
 
-          <Card>
+          <Card className="rounded-lg shadow-none ring-0 border">
             <CardHeader>
-              <CardTitle>Tickets per day</CardTitle>
+              <CardTitle className="font-display text-lg font-semibold tracking-tight">
+                <h2>Tickets per day</h2>
+              </CardTitle>
               <CardDescription>New tickets over the last {DASHBOARD_DAYS} days</CardDescription>
             </CardHeader>
             <CardContent>

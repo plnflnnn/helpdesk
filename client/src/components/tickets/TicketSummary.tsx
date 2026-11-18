@@ -32,7 +32,7 @@ export function TicketSummary({ ticketId }: { ticketId: number }) {
       {summarize.data && (
         <section
           aria-labelledby="summary-heading"
-          className="rounded-xl border border-dashed bg-muted/40 p-4"
+          className="rounded-lg border border-dashed border-primary/30 bg-muted/60 p-4"
         >
           <h2
             id="summary-heading"
@@ -41,7 +41,9 @@ export function TicketSummary({ ticketId }: { ticketId: number }) {
             <SparklesIcon className="size-4" aria-hidden />
             Summary
           </h2>
-          <p className="text-sm whitespace-pre-wrap break-words">{summarize.data}</p>
+          <p className="max-w-[70ch] text-[0.9375rem] leading-relaxed whitespace-pre-wrap break-words">
+            {summarize.data}
+          </p>
         </section>
       )}
     </div>

@@ -8,6 +8,7 @@ import { ReplyForm } from '@/components/tickets/ReplyForm';
 import { StatusBadge } from '@/components/tickets/TicketBadges';
 import { TicketSummary } from '@/components/tickets/TicketSummary';
 import { TicketFieldsPanel } from '@/components/tickets/TicketFieldsPanel';
+import { Skeleton, SkeletonRegion } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -17,7 +18,7 @@ function BackLink() {
   return (
     <Link
       to="/tickets"
-      className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       <ArrowLeftIcon className="size-4" aria-hidden />
       All tickets
@@ -29,7 +30,10 @@ function NotFound() {
   return (
     <div className="flex flex-col gap-4">
       <BackLink />
-      <h1 className="text-2xl font-semibold">Ticket not found</h1>
+      <h1 className="text-[1.75rem] font-semibold tracking-tight">Ticket not found</h1>
+      <p className="text-muted-foreground">
+        It may have been deleted, or the link has a wrong ticket number.
+      </p>
     </div>
   );
 }
@@ -47,7 +51,7 @@ export function TicketDetailPage() {
     return <NotFound />;
   }
   if (ticket.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading ticket…</p>;
+    return <TicketDetailSkeleton />;
   }
   if (ticket.isError) {
     if (isAxiosError(ticket.error) && ticket.error.response?.status === 404) {
@@ -72,17 +76,21 @@ function TicketView({ ticket }: { ticket: TicketDetail }) {
     <div className="flex flex-col gap-6">
       <BackLink />
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold break-words">{ticket.subject}</h1>
-          <StatusBadge status={ticket.status} />
+        <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+          <h1 className="text-[1.625rem] leading-tight font-semibold tracking-tight break-words md:text-[2rem]">
+            {ticket.subject}
+          </h1>
+          <span className="pt-1.5 md:pt-2.5">
+            <StatusBadge status={ticket.status} />
+          </span>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm break-words text-muted-foreground">
           #{ticket.id} · {student.name ? `${student.name} <${student.email}>` : student.email} ·
           Opened {formatDate(ticket.createdAt)}
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-10">
         <div className="flex flex-col gap-6">
           <section aria-label="Message" className="flex flex-col gap-3">
             {originalMessage ? (
@@ -96,7 +104,7 @@ function TicketView({ ticket }: { ticket: TicketDetail }) {
           </section>
 
           <section aria-labelledby="replies-heading" className="flex flex-col gap-4">
-            <h2 id="replies-heading" className="text-lg font-semibold">
+            <h2 id="replies-heading" className="text-lg font-semibold tracking-tight">
               Replies ({replies.length})
             </h2>
             {replies.length === 0 ? (
@@ -112,7 +120,7 @@ function TicketView({ ticket }: { ticket: TicketDetail }) {
 
         <aside
           aria-label="Ticket details"
-          className="h-fit rounded-xl border bg-background p-4 lg:sticky lg:top-6"
+          className="h-fit rounded-lg border bg-card p-5 lg:sticky lg:top-10"
         >
           <TicketFieldsPanel ticket={ticket} />
         </aside>
@@ -123,21 +131,75 @@ function TicketView({ ticket }: { ticket: TicketDetail }) {
 
 function MessageCard({ message, studentName }: { message: TicketMessage; studentName: string }) {
   const outbound = message.direction === 'outbound';
-  const sender = outbound ? (message.author?.name ?? 'Agent') : studentName;
+  // Outbound messages without an author are the AI's auto-replies.
+  const sender = outbound ? (message.author?.name ?? 'Support Team (AI)') : studentName;
   return (
     <article
       className={cn(
-        'rounded-xl border p-4',
-        outbound ? 'ml-8 border-primary/20 bg-primary/5' : 'mr-8 bg-background',
+        'rounded-lg border p-4 md:p-5',
+        // Student letters sit left on white; support replies sit right on a moss tint.
+        outbound
+          ? 'ml-4 border-primary/25 bg-primary/[0.06] sm:ml-12'
+          : 'mr-4 bg-card shadow-[0_1px_0_var(--color-border)] sm:mr-12',
       )}
     >
-      <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-        <span className="font-medium">{sender}</span>
-        <time className="text-xs text-muted-foreground" dateTime={message.createdAt}>
+      <header className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="font-display font-semibold">{sender}</span>
+        <time className="text-xs text-muted-foreground tabular-nums" dateTime={message.createdAt}>
           {formatDate(message.createdAt)}
         </time>
       </header>
-      <p className="text-sm whitespace-pre-wrap break-words">{message.bodyText}</p>
+      <p className="max-w-[70ch] text-[0.9375rem] leading-relaxed whitespace-pre-wrap break-words">
+        {message.bodyText}
+      </p>
     </article>
+  );
+}
+
+/** The ticket page's shape while it loads: title, the student's email, and the details panel. */
+function TicketDetailSkeleton() {
+  return (
+    <SkeletonRegion label="Loading ticket…" className="flex flex-col gap-6">
+      <Skeleton className="h-4 w-24" />
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-3/4 max-w-lg" />
+          <Skeleton className="h-5 w-14 rounded-md" />
+        </div>
+        <Skeleton className="h-4 w-2/3 max-w-sm" />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-10">
+        <div className="flex flex-col gap-4">
+          <div className="mr-4 flex flex-col gap-3 rounded-lg border bg-card p-5 sm:mr-12">
+            <div className="flex justify-between gap-4">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3.5 w-11/12" />
+            <Skeleton className="h-3.5 w-4/5" />
+            <Skeleton className="h-3.5 w-2/5" />
+          </div>
+          <Skeleton className="h-7 w-28" />
+          <Skeleton className="mt-2 h-5 w-24" />
+          <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
+            <Skeleton className="h-4 w-12" />
+            <Skeleton className="h-28 w-full" />
+            <div className="flex justify-end gap-2">
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          </div>
+        </div>
+        <div className="flex h-fit flex-col gap-5 rounded-lg border bg-card p-5">
+          {['Status', 'Category', 'Assignee', 'Priority'].map((field) => (
+            <div key={field} className="flex flex-col gap-2">
+              <Skeleton className="h-3.5 w-16" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </SkeletonRegion>
   );
 }

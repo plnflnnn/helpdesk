@@ -37,11 +37,13 @@ export function ReplyForm({ ticketId }: { ticketId: number }) {
 
   return (
     <form
-      className="flex flex-col gap-2 rounded-xl border bg-background p-4"
+      className="flex flex-col gap-2 rounded-lg border bg-card p-4 md:p-5"
       onSubmit={form.handleSubmit((data) => send.mutate(data))}
       noValidate
     >
-      <Label htmlFor="reply-body">Reply</Label>
+      <Label htmlFor="reply-body" className="font-display text-base font-semibold">
+        Reply
+      </Label>
       {polish.error && (
         <Alert variant="destructive">
           <AlertDescription>
@@ -65,7 +67,7 @@ export function ReplyForm({ ticketId }: { ticketId: number }) {
         {...form.register('bodyText')}
       />
       <FieldError id="reply-body-error" error={error} />
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button
           type="button"
           variant="outline"

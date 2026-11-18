@@ -1,5 +1,4 @@
 import { Navigate, useLocation } from 'react-router';
-import { LifeBuoyIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginInputSchema } from '@helpdesk/shared';
@@ -7,7 +6,6 @@ import { useCurrentUser, useLogin } from '@/auth/useAuth';
 import { FieldError } from '@/components/FieldError';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -30,19 +28,31 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <div className="mb-2 flex items-center gap-2 font-semibold">
-            <LifeBuoyIcon className="size-5 text-primary" aria-hidden />
+    <div className="grid min-h-screen md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      {/* Chalkboard panel: wider screens only. */}
+      <div className="hidden flex-col justify-between bg-sidebar p-10 text-sidebar-foreground md:flex lg:p-14">
+        <span className="font-display text-lg font-semibold tracking-tight text-white">
+          Helpdesk
+        </span>
+        <p className="max-w-sm font-display text-[2.5rem] leading-[1.1] font-semibold tracking-tight text-white lg:text-[3rem]">
+          Every student question, answered.
+        </p>
+        <p className="max-w-xs text-sm text-sidebar-foreground/70">
+          The AI sorts and drafts. You decide what gets sent.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-center px-4 py-12 sm:px-8">
+        <div className="flex w-full max-w-sm flex-col gap-8">
+          <span className="font-display text-lg font-semibold tracking-tight md:hidden">
             Helpdesk
+          </span>
+          <div className="flex flex-col gap-2">
+            <h1 className="text-[2rem] leading-tight font-semibold tracking-tight">Sign in</h1>
+            <p className="text-muted-foreground">
+              Use the email and password for your agent account.
+            </p>
           </div>
-          <CardTitle>
-            <h1>Sign in</h1>
-          </CardTitle>
-          <CardDescription>Use the email and password for your agent account.</CardDescription>
-        </CardHeader>
-        <CardContent>
           <form
             className="flex flex-col gap-4"
             onSubmit={handleSubmit((data) => login.mutate(data))}
@@ -61,6 +71,7 @@ export function LoginPage() {
                 autoComplete="username"
                 aria-invalid={errors.email ? true : undefined}
                 aria-describedby={errors.email ? 'email-error' : undefined}
+                className="h-10 bg-card"
                 {...register('email')}
               />
               <FieldError id="email-error" error={errors.email} />
@@ -73,16 +84,17 @@ export function LoginPage() {
                 autoComplete="current-password"
                 aria-invalid={errors.password ? true : undefined}
                 aria-describedby={errors.password ? 'password-error' : undefined}
+                className="h-10 bg-card"
                 {...register('password')}
               />
               <FieldError id="password-error" error={errors.password} />
             </div>
-            <Button type="submit" size="lg" disabled={login.isPending}>
+            <Button type="submit" size="lg" className="mt-2 h-10" disabled={login.isPending}>
               {login.isPending ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { errorMessage } from '@/lib/errors';
 
 /** Assignee select value meaning "nobody". */
@@ -122,7 +123,10 @@ export function TicketFieldsPanel({ ticket }: { ticket: TicketDetail }) {
           {assignees.isError ? (
             <span className="text-sm text-destructive">Could not load agents to assign.</span>
           ) : (
-            <span className="text-sm text-muted-foreground">Loading agents…</span>
+            <>
+              <Skeleton className="h-8 w-full" />
+              <span className="sr-only">Loading agents…</span>
+            </>
           )}
         </div>
       )}

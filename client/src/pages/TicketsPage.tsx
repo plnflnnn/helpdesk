@@ -7,7 +7,8 @@ import { listTicketsQuerySchema, type ListTicketsQuery } from '@helpdesk/shared'
 import { listTickets, ticketsQueryKey } from '@/api/tickets';
 import { TicketFilters, type TicketFilterValues } from '@/components/tickets/TicketFilters';
 import { TicketsPagination } from '@/components/tickets/TicketsPagination';
-import { TicketsTable } from '@/components/tickets/TicketsTable';
+import { TicketsTable, TicketsTableSkeleton } from '@/components/tickets/TicketsTable';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -96,7 +97,10 @@ export function TicketsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Tickets</h1>
+      <PageHeader
+        title="Tickets"
+        description="Student emails. Open tickets are in bold until someone picks them up."
+      />
 
       <TicketFilters
         search={query.search}
@@ -105,8 +109,8 @@ export function TicketsPage() {
         onChange={onFiltersChange}
       />
 
-      <div className="rounded-xl border bg-background">
-        {tickets.isPending && <p className="p-6 text-sm text-muted-foreground">Loading tickets…</p>}
+      <div className="overflow-hidden rounded-lg border bg-card">
+        {tickets.isPending && <TicketsTableSkeleton />}
         {tickets.isError && (
           <p className="p-6 text-sm text-destructive">
             Could not load tickets: {tickets.error.message}
@@ -114,7 +118,7 @@ export function TicketsPage() {
         )}
         {total === 0 &&
           (isFiltered ? (
-            <div className="flex flex-col items-center gap-3 p-12 text-center text-muted-foreground">
+            <div className="flex flex-col items-center gap-3 px-6 py-14 text-center text-muted-foreground">
               <SearchXIcon className="size-8" aria-hidden />
               <p>No tickets match these filters.</p>
               <Button
@@ -128,7 +132,7 @@ export function TicketsPage() {
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2 p-12 text-center text-muted-foreground">
+            <div className="flex flex-col items-center gap-2 px-6 py-14 text-center text-muted-foreground">
               <InboxIcon className="size-8" aria-hidden />
               <p>No tickets yet. Incoming support email will show up here.</p>
             </div>
