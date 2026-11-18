@@ -19,6 +19,8 @@ const envSchema = z.object({
   SENDGRID_API_KEY: z.string().min(1).optional(),
   /** The support address emails are sent from; must be a verified sender in SendGrid. */
   SENDGRID_FROM_EMAIL: z.email().optional(),
+  /** Shared secret in the Inbound Parse webhook URL. Without it, the webhook rejects every request. */
+  SENDGRID_INBOUND_SECRET: z.string().min(16).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

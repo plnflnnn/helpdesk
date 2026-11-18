@@ -3,6 +3,7 @@ import type { Role } from '@helpdesk/shared';
 import type { Auth } from '@/auth.js';
 import type { Database } from '@/db.js';
 import type { Env } from '@/env.js';
+import type { JobQueue } from '@/jobs/queue.js';
 import type { Mailer } from '@/services/email.js';
 
 /** Services the API routes need. */
@@ -13,6 +14,10 @@ export type Services = {
   aiModel?: LanguageModel;
   /** Sends email to students. */
   mailer: Mailer;
+  /** Background job queue (pg-boss). */
+  jobs: JobQueue;
+  /** Secret the SendGrid Inbound Parse webhook must send; the webhook rejects everything without one. */
+  inboundEmailSecret?: string;
 };
 
 export type AppDependencies = {

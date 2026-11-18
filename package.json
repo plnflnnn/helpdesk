@@ -11,9 +11,10 @@
     "client"
   ],
   "scripts": {
-    "dev": "npm run build -w shared && concurrently -k -n shared,server,client -c gray,blue,green \"npm run dev -w shared\" \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev": "npm run build -w shared && concurrently -k -n shared,server,worker,client -c gray,blue,magenta,green \"npm run dev -w shared\" \"npm run dev -w server\" \"npm run dev:worker -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "start": "npm run start -w server",
+    "start:worker": "npm run start:worker -w server",
     "test": "npm run build -w shared && npm run test -w server && npm run test -w client",
     "test:e2e": "npm run build -w shared && playwright test",
     "typecheck": "npm run build -w shared && npm run typecheck -w server && npm run typecheck -w client",

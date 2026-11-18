@@ -1,9 +1,10 @@
 import { fileURLToPath } from 'node:url';
-import { createOpenAI } from '@ai-sdk/openai';
 import { createApp } from '@/app.js';
 import { createAuth } from '@/auth.js';
 import { createPrismaClient, isDatabaseUp } from '@/db.js';
 import { parseEnv } from '@/env.js';
+import { createJobQueue, startBoss } from '@/jobs/queue.js';
+import { createAiModel } from '@/services/ai.js';
 import { createConsoleMailer, createSendGridMailer } from '@/services/email.js';
 
 const env = parseEnv(process.env);
@@ -17,15 +18,18 @@ const mailer =
     ? createSendGridMailer({ apiKey: env.SENDGRID_API_KEY, from: env.SENDGRID_FROM_EMAIL })
     : createConsoleMailer(env.SENDGRID_FROM_EMAIL);
 
+// The web server only sends jobs; the worker (`npm run dev:worker` / `start:worker`) runs them.
+const boss = await startBoss(env.DATABASE_URL);
+
 const app = createApp({
   checkDatabase: () => isDatabaseUp(db),
   services: {
     db,
     auth: createAuth(db, env),
-    aiModel: env.OPENAI_API_KEY
-      ? createOpenAI({ apiKey: env.OPENAI_API_KEY })(env.OPENAI_MODEL)
-      : undefined,
+    aiModel: createAiModel(env),
     mailer,
+    jobs: createJobQueue(boss),
+    inboundEmailSecret: env.SENDGRID_INBOUND_SECRET,
   },
   clientDistPath:
     env.NODE_ENV === 'production'
@@ -40,7 +44,7 @@ const server = app.listen(env.PORT, () => {
 function shutdown(signal: string) {
   console.log(`${signal} received, shutting down`);
   server.close(() => {
-    void db.$disconnect().finally(() => process.exit(0));
+    void Promise.allSettled([boss.stop(), db.$disconnect()]).finally(() => process.exit(0));
   });
 }
 

@@ -6,6 +6,7 @@ import { Role } from '@helpdesk/shared';
 import { createApp } from '@/app.js';
 import { createAuth } from '@/auth.js';
 import { createPrismaClient } from '@/db.js';
+import type { JobQueue } from '@/jobs/queue.js';
 import type { Mailer } from '@/services/email.js';
 import { testDatabaseUrl } from '@/test/database-url.js';
 
@@ -23,12 +24,17 @@ type TestContextOptions = {
   aiModel?: LanguageModel;
   /** Defaults to one that accepts every email and sends nothing. */
   mailer?: Mailer;
+  /** Defaults to one that accepts every job and runs nothing. */
+  jobs?: JobQueue;
 };
+
+export const INBOUND_EMAIL_SECRET = 'test-inbound-secret-0123456789';
 
 /** A real app wired to the test database. Call `reset()` before each test and `close()` after all. */
 export function createTestContext({
   aiModel,
   mailer = { from: 'support@example.com', send: async () => {} },
+  jobs = { classifyTicket: async () => {} },
 }: TestContextOptions = {}) {
   const db = createPrismaClient(testDatabaseUrl());
   const auth = createAuth(db, {
@@ -39,7 +45,7 @@ export function createTestContext({
   });
   const app = createApp({
     checkDatabase: async () => true,
-    services: { db, auth, aiModel, mailer },
+    services: { db, auth, aiModel, mailer, jobs, inboundEmailSecret: INBOUND_EMAIL_SECRET },
   });
 
   async function reset() {

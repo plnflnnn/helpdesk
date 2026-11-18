@@ -1,6 +1,15 @@
+import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, type LanguageModel } from 'ai';
 import type { TicketDetail } from '@helpdesk/shared';
+import type { Env } from '@/env.js';
 import { badGateway, serviceUnavailable } from '@/errors.js';
+
+/** The configured AI model, or undefined when there is no OpenAI key. */
+export function createAiModel(env: Pick<Env, 'OPENAI_API_KEY' | 'OPENAI_MODEL'>) {
+  return env.OPENAI_API_KEY
+    ? createOpenAI({ apiKey: env.OPENAI_API_KEY })(env.OPENAI_MODEL)
+    : undefined;
+}
 
 /** The configured model; responds 503 when there is none (no OpenAI key). */
 export function requireModel(model: LanguageModel | undefined): LanguageModel {

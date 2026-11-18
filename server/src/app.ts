@@ -7,6 +7,7 @@ import { apiNotFound, errorHandler } from '@/middleware/error-handler.js';
 import { healthRouter } from '@/routes/health.js';
 import { ticketsRouter } from '@/routes/tickets.js';
 import { usersRouter } from '@/routes/users.js';
+import { webhooksRouter } from '@/routes/webhooks.js';
 import type { AppDependencies } from '@/types.js';
 
 export function createApp({ checkDatabase, services, clientDistPath }: AppDependencies) {
@@ -32,6 +33,10 @@ export function createApp({ checkDatabase, services, clientDistPath }: AppDepend
   }
 
   app.use('/api', apiNotFound);
+
+  if (services) {
+    app.use('/webhooks', webhooksRouter(services));
+  }
 
   // In production the server also serves the React app, falling back to index.html for its routes.
   if (clientDistPath) {
