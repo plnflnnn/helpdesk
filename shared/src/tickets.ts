@@ -54,7 +54,11 @@ export const ticketListItemSchema = z.object({
 });
 export type TicketListItem = z.infer<typeof ticketListItemSchema>;
 
-export const listTicketsResponseSchema = z.object({ tickets: z.array(ticketListItemSchema) });
+/** One page of tickets, and how many tickets match the filters in total. */
+export const listTicketsResponseSchema = z.object({
+  tickets: z.array(ticketListItemSchema),
+  total: z.number().int().nonnegative(),
+});
 export type ListTicketsResponse = z.infer<typeof listTicketsResponseSchema>;
 
 // List query.
@@ -72,15 +76,22 @@ export type TicketSortField = z.infer<typeof ticketSortFieldSchema>;
 export const sortOrderSchema = z.enum(['asc', 'desc']);
 export type SortOrder = z.infer<typeof sortOrderSchema>;
 
+/** Tickets per page, unless the request asks for another page size. */
+export const TICKETS_PAGE_SIZE = 25;
+/** Largest page size accepted. */
+export const TICKETS_MAX_PAGE_SIZE = 100;
+
 /** Longest search text accepted. */
 export const TICKET_SEARCH_MAX_LENGTH = 200;
 
 /**
  * Query string of `GET /api/tickets`. Newest tickets first by default.
  * `search` matches the subject, message bodies and the sender's name or email (case-insensitive);
- * an empty search is the same as none.
+ * an empty search is the same as none. `page` starts at 1.
  */
 export const listTicketsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(TICKETS_MAX_PAGE_SIZE).default(TICKETS_PAGE_SIZE),
   sortBy: ticketSortFieldSchema.default('createdAt'),
   sortOrder: sortOrderSchema.default('desc'),
   search: z

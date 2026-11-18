@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { InboxIcon, SearchXIcon } from 'lucide-react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
@@ -6,6 +6,7 @@ import { functionalUpdate, type OnChangeFn, type SortingState } from '@tanstack/
 import { listTicketsQuerySchema, type ListTicketsQuery } from '@helpdesk/shared';
 import { listTickets, ticketsQueryKey } from '@/api/tickets';
 import { TicketFilters, type TicketFilterValues } from '@/components/tickets/TicketFilters';
+import { TicketsPagination } from '@/components/tickets/TicketsPagination';
 import { TicketsTable } from '@/components/tickets/TicketsTable';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,30 @@ export function TicketsPage() {
     placeholderData: keepPreviousData,
   });
   const isFiltered = Boolean(query.search || query.status || query.category);
+  const total = tickets.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
+
+  /** Shows the given page; page 1 is left out of the URL. */
+  const onPageChange = useCallback(
+    (page: number, options?: { replace?: boolean }) => {
+      setSearchParams((params) => {
+        if (page > 1) {
+          params.set('page', String(page));
+        } else {
+          params.delete('page');
+        }
+        return params;
+      }, options);
+    },
+    [setSearchParams],
+  );
+
+  // A page past the end (e.g. after tickets were closed or the URL was edited) shows the last page.
+  useEffect(() => {
+    if (tickets.data && query.page > pageCount) {
+      onPageChange(pageCount, { replace: true });
+    }
+  }, [tickets.data, query.page, pageCount, onPageChange]);
 
   const sorting: SortingState = [{ id: query.sortBy, desc: query.sortOrder === 'desc' }];
   const onSortingChange: OnChangeFn<SortingState> = (updater) => {
@@ -41,6 +66,8 @@ export function TicketsPage() {
     setSearchParams((params) => {
       params.set('sortBy', sort.id);
       params.set('sortOrder', sort.desc ? 'desc' : 'asc');
+      // A new sort starts from the first page.
+      params.delete('page');
       return params;
     });
   };
@@ -57,6 +84,8 @@ export function TicketsPage() {
               params.delete(key);
             }
           }
+          // New filters start from the first page.
+          params.delete('page');
           return params;
         },
         { replace: 'search' in filters },
@@ -83,7 +112,7 @@ export function TicketsPage() {
             Could not load tickets: {tickets.error.message}
           </p>
         )}
-        {tickets.data?.length === 0 &&
+        {total === 0 &&
           (isFiltered ? (
             <div className="flex flex-col items-center gap-3 p-12 text-center text-muted-foreground">
               <SearchXIcon className="size-8" aria-hidden />
@@ -104,15 +133,22 @@ export function TicketsPage() {
               <p>No tickets yet. Incoming support email will show up here.</p>
             </div>
           ))}
-        {tickets.data && tickets.data.length > 0 && (
+        {tickets.data && total > 0 && (
           <div
             className={cn('transition-opacity', tickets.isPlaceholderData && 'opacity-60')}
             aria-busy={tickets.isPlaceholderData}
           >
             <TicketsTable
-              tickets={tickets.data}
+              tickets={tickets.data.tickets}
               sorting={sorting}
               onSortingChange={onSortingChange}
+            />
+            <TicketsPagination
+              page={Math.min(query.page, pageCount)}
+              pageCount={pageCount}
+              pageSize={query.pageSize}
+              total={total}
+              onPageChange={onPageChange}
             />
           </div>
         )}

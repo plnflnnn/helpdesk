@@ -25,7 +25,7 @@ export function ticketsRouter({ db, auth }: Services) {
   router.use(requireAuth(auth));
 
   router.get('/', validate({ query: listTicketsQuerySchema }), async (req, res) => {
-    const body: ListTicketsResponse = { tickets: await listTickets(db, req.query) };
+    const body: ListTicketsResponse = await listTickets(db, req.query);
     res.json(body);
   });
 

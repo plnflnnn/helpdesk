@@ -159,7 +159,33 @@ describe('GET /api/tickets', () => {
     expect(subjects(listTicketsResponseSchema.parse(response.body).tickets)).toEqual(expected);
   });
 
+  it('returns one page at a time, with the total number of matching tickets', async () => {
+    await seedTickets();
+
+    const first = listTicketsResponseSchema.parse((await listAs('?pageSize=2')).body);
+    const second = listTicketsResponseSchema.parse((await listAs('?pageSize=2&page=2')).body);
+    const beyond = listTicketsResponseSchema.parse((await listAs('?pageSize=2&page=3')).body);
+
+    expect(first).toMatchObject({ total: 3 });
+    expect(subjects(first.tickets)).toEqual(['Refund please', 'Where is the certificate?']);
+    expect(second).toMatchObject({ total: 3 });
+    expect(subjects(second.tickets)).toEqual(['Cannot log in']);
+    expect(beyond).toEqual({ tickets: [], total: 3 });
+  });
+
+  it('counts only the tickets that match the filters', async () => {
+    await seedTickets();
+
+    const response = await listAs('?status=open&pageSize=1');
+
+    expect(listTicketsResponseSchema.parse(response.body)).toMatchObject({ total: 1 });
+  });
+
   it.each([
+    ['?page=0'],
+    ['?page=abc'],
+    ['?pageSize=0'],
+    ['?pageSize=101'],
     ['?sortBy=password'],
     ['?sortOrder=sideways'],
     ['?status=archived'],

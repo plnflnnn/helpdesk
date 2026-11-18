@@ -29,6 +29,9 @@ const refundTicket: TicketListItem = {
   updatedAt: '2026-11-03T10:00:00.000Z',
 };
 
+/** Paging params every request sends unless the URL picks another page. */
+const firstPage = { page: 1, pageSize: 25 };
+
 /** Serves the tickets in the order the requested sort gives, and records each request's params. */
 function mockTicketsApi() {
   const requests: Record<string, string>[] = [];
@@ -38,7 +41,7 @@ function mockTicketsApi() {
       requests.push(params);
       const bySubjectAsc = params.sortBy === 'subject' && params.sortOrder === 'asc';
       const tickets = bySubjectAsc ? [refundTicket, loginTicket] : [loginTicket, refundTicket];
-      return { status: 200, body: { tickets } };
+      return { status: 200, body: { tickets, total: tickets.length } };
     },
   });
   return requests;
@@ -76,7 +79,7 @@ describe('tickets page', () => {
     renderApp('/');
 
     await screen.findByText(loginTicket.subject);
-    expect(requests[0]).toEqual({ sortBy: 'createdAt', sortOrder: 'desc' });
+    expect(requests[0]).toEqual({ ...firstPage, sortBy: 'createdAt', sortOrder: 'desc' });
     expect(screen.getByRole('columnheader', { name: /Created/ })).toHaveAttribute(
       'aria-sort',
       'descending',
@@ -90,7 +93,9 @@ describe('tickets page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Subject/ }));
 
-    await waitFor(() => expect(requests.at(-1)).toEqual({ sortBy: 'subject', sortOrder: 'asc' }));
+    await waitFor(() =>
+      expect(requests.at(-1)).toEqual({ ...firstPage, sortBy: 'subject', sortOrder: 'asc' }),
+    );
     await waitFor(() =>
       expect(subjectCells()).toEqual([refundTicket.subject, loginTicket.subject]),
     );
@@ -101,7 +106,9 @@ describe('tickets page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Subject/ }));
 
-    await waitFor(() => expect(requests.at(-1)).toEqual({ sortBy: 'subject', sortOrder: 'desc' }));
+    await waitFor(() =>
+      expect(requests.at(-1)).toEqual({ ...firstPage, sortBy: 'subject', sortOrder: 'desc' }),
+    );
   });
 
   it('starts the Created column descending', async () => {
@@ -112,7 +119,7 @@ describe('tickets page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Created/ }));
 
     await waitFor(() =>
-      expect(requests.at(-1)).toEqual({ sortBy: 'createdAt', sortOrder: 'desc' }),
+      expect(requests.at(-1)).toEqual({ ...firstPage, sortBy: 'createdAt', sortOrder: 'desc' }),
     );
   });
 
@@ -123,6 +130,7 @@ describe('tickets page', () => {
 
     await screen.findByText(loginTicket.subject);
     expect(requests[0]).toEqual({
+      ...firstPage,
       sortBy: 'student',
       sortOrder: 'asc',
       status: 'open',
@@ -142,6 +150,7 @@ describe('tickets page', () => {
 
     await waitFor(() =>
       expect(requests.at(-1)).toEqual({
+        ...firstPage,
         sortBy: 'createdAt',
         sortOrder: 'desc',
         search: 'charged twice',
@@ -165,7 +174,12 @@ describe('tickets page', () => {
     fireEvent.click(item);
 
     await waitFor(() =>
-      expect(requests.at(-1)).toEqual({ sortBy: 'createdAt', sortOrder: 'desc', ...params }),
+      expect(requests.at(-1)).toEqual({
+        ...firstPage,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        ...params,
+      }),
     );
   });
 
@@ -175,7 +189,8 @@ describe('tickets page', () => {
       'GET /api/me': () => ({ status: 200, body: { user: agentUser } }),
       'GET /api/tickets': (_body, params) => {
         requests.push(params);
-        return { status: 200, body: { tickets: params.status ? [] : [loginTicket] } };
+        const tickets = params.status ? [] : [loginTicket];
+        return { status: 200, body: { tickets, total: tickets.length } };
       },
     });
     renderApp('/?status=closed&search=zzz');
@@ -183,14 +198,95 @@ describe('tickets page', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Clear filters' }));
 
     expect(await screen.findByText(loginTicket.subject)).toBeInTheDocument();
-    expect(requests.at(-1)).toEqual({ sortBy: 'createdAt', sortOrder: 'desc' });
+    expect(requests.at(-1)).toEqual({ ...firstPage, sortBy: 'createdAt', sortOrder: 'desc' });
     expect(screen.getByRole('searchbox', { name: 'Search tickets' })).toHaveValue('');
+  });
+
+  describe('pagination', () => {
+    /** 60 tickets, served a page at a time like the server does. */
+    function mockManyTicketsApi() {
+      const all = Array.from({ length: 60 }, (_, index) => ({
+        ...loginTicket,
+        id: index + 1,
+        subject: `Ticket ${index + 1}`,
+      }));
+      const requests: Record<string, unknown>[] = [];
+      mockApi({
+        'GET /api/me': () => ({ status: 200, body: { user: agentUser } }),
+        'GET /api/tickets': (_body, params) => {
+          requests.push(params);
+          const page = Number(params.page);
+          const pageSize = Number(params.pageSize);
+          const tickets = all.slice((page - 1) * pageSize, page * pageSize);
+          return { status: 200, body: { tickets, total: all.length } };
+        },
+      });
+      return requests;
+    }
+
+    const nav = () => screen.getByRole('navigation', { name: 'Pagination' });
+
+    it('shows the first page with a summary and moves between pages', async () => {
+      const requests = mockManyTicketsApi();
+      renderApp('/');
+
+      expect(await screen.findByText('Ticket 1')).toBeInTheDocument();
+      expect(nav()).toHaveTextContent('Showing 1–25 of 60');
+      expect(nav()).toHaveTextContent('Page 1 of 3');
+      expect(within(nav()).getByRole('button', { name: /Previous/ })).toBeDisabled();
+
+      fireEvent.click(within(nav()).getByRole('button', { name: /Next/ }));
+
+      expect(await screen.findByText('Ticket 26')).toBeInTheDocument();
+      expect(requests.at(-1)).toMatchObject({ page: 2 });
+      expect(nav()).toHaveTextContent('Showing 26–50 of 60');
+
+      fireEvent.click(within(nav()).getByRole('button', { name: /Next/ }));
+
+      expect(await screen.findByText('Ticket 51')).toBeInTheDocument();
+      expect(nav()).toHaveTextContent('Showing 51–60 of 60');
+      expect(within(nav()).getByRole('button', { name: /Next/ })).toBeDisabled();
+
+      fireEvent.click(within(nav()).getByRole('button', { name: /Previous/ }));
+
+      expect(await screen.findByText('Ticket 26')).toBeInTheDocument();
+    });
+
+    it('reads the page from the URL', async () => {
+      const requests = mockManyTicketsApi();
+
+      renderApp('/?page=2');
+
+      expect(await screen.findByText('Ticket 26')).toBeInTheDocument();
+      expect(requests[0]).toMatchObject({ page: 2 });
+    });
+
+    it('goes back to the first page when the sort changes', async () => {
+      const requests = mockManyTicketsApi();
+      renderApp('/?page=2');
+      await screen.findByText('Ticket 26');
+
+      fireEvent.click(screen.getByRole('button', { name: /Subject/ }));
+
+      await waitFor(() =>
+        expect(requests.at(-1)).toEqual({ ...firstPage, sortBy: 'subject', sortOrder: 'asc' }),
+      );
+    });
+
+    it('shows the last page when the URL asks for a page past the end', async () => {
+      const requests = mockManyTicketsApi();
+
+      renderApp('/?page=9');
+
+      expect(await screen.findByText('Ticket 51')).toBeInTheDocument();
+      expect(requests.at(-1)).toMatchObject({ page: 3 });
+    });
   });
 
   it('shows an empty state when there are no tickets', async () => {
     mockApi({
       'GET /api/me': () => ({ status: 200, body: { user: agentUser } }),
-      'GET /api/tickets': () => ({ status: 200, body: { tickets: [] } }),
+      'GET /api/tickets': () => ({ status: 200, body: { tickets: [], total: 0 } }),
     });
 
     renderApp('/');

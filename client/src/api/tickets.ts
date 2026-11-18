@@ -12,9 +12,10 @@ export const ticketsQueryKey = ['tickets'] as const;
 export const ticketQueryKey = (id: number) => ['ticket', id] as const;
 export const assigneesQueryKey = ['assignees'] as const;
 
+/** One page of tickets and the total number matching the filters. */
 export async function listTickets(query: ListTicketsQueryInput) {
   const { data } = await axios.get('/api/tickets', { params: query });
-  return listTicketsResponseSchema.parse(data).tickets;
+  return listTicketsResponseSchema.parse(data);
 }
 
 export async function getTicket(id: number) {

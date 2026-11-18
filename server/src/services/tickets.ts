@@ -63,12 +63,15 @@ function whereFilters({ search, status, category }: ListTicketsQuery): Prisma.Ti
   return where;
 }
 
-/** Tickets matching the filters, sorted on the database. Ties go to the newest ticket. */
+/**
+ * One page of the tickets matching the filters, sorted on the database (ties go to the newest
+ * ticket), and how many tickets match in total.
+ */
 export async function listTickets(
   db: Database,
   query: ListTicketsQuery,
-): Promise<TicketListItem[]> {
-  const { sortBy, sortOrder } = query;
+): Promise<{ tickets: TicketListItem[]; total: number }> {
+  const { sortBy, sortOrder, page, pageSize } = query;
   const orderBy: Prisma.TicketOrderByWithRelationInput[] = [orderByField(sortBy, sortOrder)];
   if (sortBy === 'student') {
     // Students without a name are told apart by email.
@@ -76,12 +79,18 @@ export async function listTickets(
   }
   orderBy.push({ id: 'desc' });
 
-  const tickets = await db.ticket.findMany({
-    where: whereFilters(query),
-    select: ticketListSelect,
-    orderBy,
-  });
-  return tickets.map(toTicketListItem);
+  const where = whereFilters(query);
+  const [tickets, total] = await db.$transaction([
+    db.ticket.findMany({
+      where,
+      select: ticketListSelect,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    db.ticket.count({ where }),
+  ]);
+  return { tickets: tickets.map(toTicketListItem), total };
 }
 
 const ticketDetailSelect = {
@@ -160,10 +169,15 @@ type AddReplyParams = {
  * Saves an agent's reply on the ticket and sets the ticket to pending (waiting on the student).
  * Replies aren't emailed yet.
  */
-export async function addReply({ db, ticketId, authorId, bodyText }: AddReplyParams): Promise<TicketDetail> {
+export async function addReply({
+  db,
+  ticketId,
+  authorId,
+  bodyText,
+}: AddReplyParams): Promise<TicketDetail> {
   const ticket = await db.ticket.findUnique({
     where: { id: ticketId },
-    select: { id: true }
+    select: { id: true },
   });
   if (!ticket) {
     throw notFound(TICKET_NOT_FOUND);

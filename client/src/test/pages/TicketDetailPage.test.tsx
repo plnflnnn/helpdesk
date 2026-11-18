@@ -45,7 +45,7 @@ function mockTicketApi({ failWith = 0 } = {}) {
   ];
   return mockApi({
     'GET /api/me': () => ({ status: 200, body: { user: agentUser } }),
-    'GET /api/tickets': () => ({ status: 200, body: { tickets: [current] } }),
+    'GET /api/tickets': () => ({ status: 200, body: { tickets: [current], total: 1 } }),
     'GET /api/tickets/7': () => ({ status: 200, body: { ticket: current } }),
     'GET /api/tickets/assignees': () => ({ status: 200, body: { assignees } }),
     'POST /api/tickets/7/replies': (body) => {
