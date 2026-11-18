@@ -2,14 +2,19 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { hashPassword } from 'better-auth/crypto';
 import { Role } from '@helpdesk/shared';
-import { createApp } from '../app.js';
-import { createAuth } from '../auth.js';
-import { createPrismaClient } from '../db.js';
-import { CREDENTIAL_PROVIDER } from '../users.js';
-import { testDatabaseUrl } from './database-url.js';
+import { createApp } from '@/app.js';
+import { createAuth } from '@/auth.js';
+import { createPrismaClient } from '@/db.js';
+import { testDatabaseUrl } from '@/test/database-url.js';
 
 export const APP_URL = 'http://localhost:3000';
 export const PASSWORD = 'correct-horse-battery';
+
+type CreateTestUserOptions = {
+  role?: Role;
+  active?: boolean;
+  email?: string;
+};
 
 /** A real app wired to the test database. Call `reset()` before each test and `close()` after all. */
 export function createTestContext() {
@@ -22,18 +27,18 @@ export function createTestContext() {
   });
   const app = createApp({
     checkDatabase: async () => true,
-    services: { db, auth, appUrl: APP_URL },
+    services: { db, auth },
   });
 
   async function reset() {
-    await db.$executeRaw`TRUNCATE TABLE "users", "sessions", "accounts", "verifications", "invites" CASCADE`;
+    await db.$executeRaw`TRUNCATE TABLE "users", "sessions", "accounts", "verifications" CASCADE`;
   }
 
   async function createUser({
     role = Role.agent,
     active = true,
     email = `${role}-${randomUUID()}@example.com`,
-  }: { role?: Role; active?: boolean; email?: string } = {}) {
+  }: CreateTestUserOptions = {}) {
     const id = randomUUID();
     return db.user.create({
       data: {
@@ -46,7 +51,6 @@ export function createTestContext() {
           create: {
             id: randomUUID(),
             accountId: id,
-            providerId: CREDENTIAL_PROVIDER,
             password: await hashPassword(PASSWORD),
           },
         },

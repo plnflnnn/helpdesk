@@ -1,6 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { currentUserQueryKey } from '@/auth/useAuth';
-import { ApiError } from './api';
 
 /**
  * Any 401 from the API means the session is gone (logged out elsewhere, expired, or the user was
@@ -12,14 +12,16 @@ export function createQueryClient() {
     mutationCache: new MutationCache({ onError: handleError }),
     defaultOptions: {
       queries: {
-        retry: (failureCount, error) =>
-          !(error instanceof ApiError && error.status < 500) && failureCount < 2,
+        retry: (failureCount, error) => {
+          const status = isAxiosError(error) ? error.response?.status : undefined;
+          return !(status !== undefined && status < 500) && failureCount < 2;
+        },
       },
     },
   });
 
   function handleError(error: Error) {
-    if (error instanceof ApiError && error.status === 401) {
+    if (isAxiosError(error) && error.response?.status === 401) {
       queryClient.setQueryData(currentUserQueryKey, null);
     }
   }

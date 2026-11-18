@@ -3,32 +3,31 @@
 // Safe to run repeatedly: an existing user with that email is promoted to an active admin,
 // and their password is left unchanged.
 
-import { randomUUID } from 'node:crypto';
 import { config } from 'dotenv';
-import { hashPassword } from 'better-auth/crypto';
 import { z } from 'zod';
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, Role } from '@helpdesk/shared';
-import { createPrismaClient } from '../src/db.js';
-import { CREDENTIAL_PROVIDER } from '../src/users.js';
+import { createUserInputSchema, passwordSchema, Role } from '@helpdesk/shared';
+import { createPrismaClient } from '@/db.js';
+import { createUser } from '@/services/users.js';
 
 config({ quiet: true });
 
 const seedEnvSchema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
-  ADMIN_EMAIL: z
-    .email()
-    .trim()
-    .transform((email) => email.toLowerCase()),
-  ADMIN_PASSWORD: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+  ADMIN_EMAIL: createUserInputSchema.shape.email,
+  ADMIN_PASSWORD: passwordSchema,
   ADMIN_NAME: z.string().trim().min(1).default('Admin'),
 });
 
-async function main() {
-  const parsed = seedEnvSchema.safeParse(process.env);
-  if (!parsed.success) {
-    throw new Error(`Invalid seed environment variables:\n${z.prettifyError(parsed.error)}`);
+function parseSeedEnv() {
+  const result = seedEnvSchema.safeParse(process.env);
+  if (!result.success) {
+    throw new Error(`Invalid seed environment variables:\n${z.prettifyError(result.error)}`);
   }
-  const env = parsed.data;
+  return result.data;
+}
+
+async function main() {
+  const env = parseSeedEnv();
   const db = createPrismaClient(env.DATABASE_URL);
 
   try {
@@ -42,22 +41,13 @@ async function main() {
       return;
     }
 
-    const userId = randomUUID();
-    await db.user.create({
+    await createUser({
+      db,
       data: {
-        id: userId,
         name: env.ADMIN_NAME,
         email: env.ADMIN_EMAIL,
-        emailVerified: true,
+        password: env.ADMIN_PASSWORD,
         role: Role.admin,
-        accounts: {
-          create: {
-            id: randomUUID(),
-            accountId: userId,
-            providerId: CREDENTIAL_PROVIDER,
-            password: await hashPassword(env.ADMIN_PASSWORD),
-          },
-        },
       },
     });
     console.log(`Created admin ${env.ADMIN_EMAIL}.`);

@@ -1,5 +1,5 @@
-import { meResponseSchema, Role } from '@helpdesk/shared';
-import { createTestContext, PASSWORD } from './test/context.js';
+import { userResponseSchema, Role } from '@helpdesk/shared';
+import { createTestContext, PASSWORD } from '@/test/context.js';
 
 const ctx = createTestContext();
 
@@ -18,7 +18,7 @@ describe('login', () => {
 
     const me = await client.get('/api/me');
     expect(me.status).toBe(200);
-    expect(meResponseSchema.parse(me.body).user).toMatchObject({
+    expect(userResponseSchema.parse(me.body).user).toMatchObject({
       id: admin.id,
       email: admin.email,
       role: Role.admin,

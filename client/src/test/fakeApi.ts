@@ -1,7 +1,6 @@
 import { jest } from '@jest/globals';
+import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { Role, type User } from '@helpdesk/shared';
-
-type Handler = (init: RequestInit | undefined) => { status: number; body?: unknown };
 
 export const adminUser: User = {
   id: 'admin-1',
@@ -20,23 +19,52 @@ export const agentUser: User = {
   role: Role.agent,
 };
 
+type Handler = (body: unknown) => { status: number; body?: unknown };
+
+const realAdapter = axios.defaults.adapter;
+
 /**
- * Replaces global fetch with handlers keyed by "METHOD /path". Unknown routes return 404.
- * Returns the jest mock so tests can inspect calls.
+ * Replaces axios's HTTP adapter with handlers keyed by "METHOD /path". Unknown routes return 404.
+ * Each handler gets the parsed JSON request body. Returns the jest mock so tests can inspect calls.
  */
 export function mockApi(routes: Record<string, Handler>) {
-  const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const key = `${init?.method ?? 'GET'} ${String(input)}`;
+  const adapter = jest.fn(async (config: InternalAxiosRequestConfig): Promise<AxiosResponse> => {
+    const key = `${config.method?.toUpperCase()} ${config.url}`;
     const handler = routes[key];
+    const requestBody: unknown =
+      typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
     const { status, body } = handler
-      ? handler(init)
+      ? handler(requestBody)
       : { status: 404, body: { error: 'Not found' } };
-    return {
-      ok: status >= 200 && status < 300,
+    const response: AxiosResponse = {
+      data: body,
       status,
-      json: async () => body,
-    } as Response;
+      statusText: '',
+      headers: {},
+      config,
+    };
+    if (status < 200 || status >= 300) {
+      throw new AxiosError(
+        `Request failed with status code ${status}`,
+        AxiosError.ERR_BAD_REQUEST,
+        config,
+        undefined,
+        response,
+      );
+    }
+    return response;
   });
-  globalThis.fetch = fetchMock as typeof fetch;
-  return fetchMock;
+  axios.defaults.adapter = adapter;
+  return adapter;
+}
+
+/** Undoes mockApi. */
+export function restoreApi() {
+  axios.defaults.adapter = realAdapter;
+}
+
+/** The parsed JSON body of the first request the mock received for `url`, if any. */
+export function requestBody(adapter: ReturnType<typeof mockApi>, url: string): unknown {
+  const call = adapter.mock.calls.find(([config]) => config.url === url);
+  return call && typeof call[0].data === 'string' ? JSON.parse(call[0].data) : undefined;
 }

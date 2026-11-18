@@ -7,7 +7,6 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { createQueryClient } from '@/lib/queryClient';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
-import { SetPasswordPage } from '@/pages/SetPasswordPage';
 import { TicketsPage } from '@/pages/TicketsPage';
 import { UsersPage } from '@/pages/UsersPage';
 
@@ -15,7 +14,6 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/set-password" element={<SetPasswordPage />} />
       <Route
         element={
           <ProtectedRoute>

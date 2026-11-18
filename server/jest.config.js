@@ -9,6 +9,9 @@ export default {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json', useESM: true }],
   },
   moduleNameMapper: {
+    // `@/` aliases src/ (see tsconfig paths).
+    '^@/(.*)\\.js$': '<rootDir>/src/$1',
+    '^@generated/(.*)\\.js$': '<rootDir>/generated/$1',
     // Source files use ESM-style `.js` import specifiers; resolve them to the .ts files.
     '^(\\.{1,2}/.*)\\.js$': '$1',
     // Test against shared source directly so tests don't depend on a shared build.

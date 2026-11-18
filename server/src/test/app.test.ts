@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { healthResponseSchema } from '@helpdesk/shared';
-import { createApp } from './app.js';
+import { createApp } from '@/app.js';
 
 describe('GET /api/health', () => {
   it('returns ok when the database is up', async () => {

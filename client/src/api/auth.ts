@@ -1,13 +1,13 @@
-import { meResponseSchema, type LoginInput, type User } from '@helpdesk/shared';
-import { ApiError, apiFetch } from '@/lib/api';
+import axios, { isAxiosError } from 'axios';
+import { userResponseSchema, type LoginInput, type User } from '@helpdesk/shared';
 
 /** The signed-in user, or null when there is no valid session. */
 export async function fetchCurrentUser(): Promise<User | null> {
   try {
-    const { user } = await apiFetch('/api/me', { schema: meResponseSchema });
-    return user;
+    const { data } = await axios.get('/api/me');
+    return userResponseSchema.parse(data).user;
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
+    if (isAxiosError(error) && error.response?.status === 401) {
       return null;
     }
     throw error;
@@ -16,15 +16,15 @@ export async function fetchCurrentUser(): Promise<User | null> {
 
 export async function signIn(input: LoginInput): Promise<void> {
   try {
-    await apiFetch('/api/auth/sign-in/email', { method: 'POST', body: input });
+    await axios.post('/api/auth/sign-in/email', input);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
-      throw new ApiError(401, 'Invalid email or password');
+    if (isAxiosError(error) && error.response?.status === 401) {
+      error.message = 'Invalid email or password';
     }
     throw error;
   }
 }
 
 export async function signOut(): Promise<void> {
-  await apiFetch('/api/auth/sign-out', { method: 'POST', body: {} });
+  await axios.post('/api/auth/sign-out', {});
 }

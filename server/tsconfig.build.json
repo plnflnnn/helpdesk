@@ -6,5 +6,5 @@
     "sourceMap": true
   },
   "include": ["src", "generated"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/test"]
 }

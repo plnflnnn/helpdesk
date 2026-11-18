@@ -1,12 +1,8 @@
-import { fireEvent, screen, within } from '@testing-library/react';
-import { adminUser, agentUser, mockApi } from '@/test/fakeApi';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { adminUser, agentUser, mockApi, requestBody, restoreApi } from '@/test/fakeApi';
 import { renderApp } from '@/test/render';
 
-const originalFetch = globalThis.fetch;
-
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-});
+afterEach(restoreApi);
 
 function fillLogin(email: string, password: string) {
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: email } });
@@ -25,7 +21,7 @@ describe('authentication', () => {
 
   it('signs in and shows the app with the user name', async () => {
     let signedIn = false;
-    const fetchMock = mockApi({
+    const api = mockApi({
       'GET /api/me': () =>
         signedIn ? { status: 200, body: { user: agentUser } } : { status: 401, body: {} },
       'POST /api/auth/sign-in/email': () => {
@@ -40,8 +36,7 @@ describe('authentication', () => {
 
     expect(await screen.findByRole('heading', { name: 'Tickets' })).toBeInTheDocument();
     expect(screen.getByText('Alan Agent')).toBeInTheDocument();
-    const signInCall = fetchMock.mock.calls.find(([url]) => url === '/api/auth/sign-in/email');
-    expect(JSON.parse(String(signInCall?.[1]?.body))).toEqual({
+    expect(requestBody(api, '/api/auth/sign-in/email')).toEqual({
       email: 'alan@example.com',
       password: 'secret-password',
     });
@@ -61,14 +56,14 @@ describe('authentication', () => {
   });
 
   it('validates the form before calling the API', async () => {
-    const fetchMock = mockApi({ 'GET /api/me': () => ({ status: 401, body: {} }) });
+    const api = mockApi({ 'GET /api/me': () => ({ status: 401, body: {} }) });
     renderApp('/login');
     await screen.findByRole('heading', { name: 'Sign in' });
 
     fillLogin('not-an-email', 'x');
 
     expect(await screen.findByText('Enter a valid email address')).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/auth/sign-in/email', expect.anything());
+    expect(requestBody(api, '/api/auth/sign-in/email')).toBeUndefined();
   });
 
   it('logs out and returns to the login page', async () => {
@@ -114,10 +109,7 @@ describe('role-based navigation', () => {
       'GET /api/users': () => ({
         status: 200,
         body: {
-          users: [
-            { ...adminUser, pendingInvite: false },
-            { ...agentUser, pendingInvite: true },
-          ],
+          users: [adminUser, { ...agentUser, active: false }],
         },
       }),
     });
@@ -127,6 +119,70 @@ describe('role-based navigation', () => {
     const nav = await screen.findByRole('navigation', { name: 'Main' });
     expect(within(nav).getByRole('link', { name: 'Users' })).toBeInTheDocument();
     expect(await screen.findByText('alan@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Invite pending')).toBeInTheDocument();
+    expect(screen.getByText('Deactivated')).toBeInTheDocument();
+  });
+});
+
+describe('editing users', () => {
+  function mockUsersApi() {
+    const updated = { ...agentUser, name: 'Alan Turing' };
+    return mockApi({
+      'GET /api/me': () => ({ status: 200, body: { user: adminUser } }),
+      'GET /api/users': () => ({ status: 200, body: { users: [adminUser, agentUser] } }),
+      [`PATCH /api/users/${agentUser.id}`]: () => ({ status: 200, body: { user: updated } }),
+    });
+  }
+
+  async function openEditDialog() {
+    renderApp('/users');
+    fireEvent.click(await screen.findByRole('button', { name: `Edit ${agentUser.name}` }));
+    return screen.findByRole('dialog');
+  }
+
+  it('fills the form with the user and keeps the password when left empty', async () => {
+    const api = mockUsersApi();
+    const dialog = await openEditDialog();
+
+    expect(within(dialog).getByLabelText('Name')).toHaveValue(agentUser.name);
+    expect(within(dialog).getByLabelText('Email')).toHaveValue(agentUser.email);
+    expect(within(dialog).getByLabelText('New password')).toHaveValue('');
+
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Alan Turing' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(requestBody(api, `/api/users/${agentUser.id}`)).toEqual({
+      name: 'Alan Turing',
+      email: agentUser.email,
+    });
+  });
+
+  it('changes the password when one is entered', async () => {
+    const api = mockUsersApi();
+    const dialog = await openEditDialog();
+
+    fireEvent.change(within(dialog).getByLabelText('New password'), {
+      target: { value: 'new-secret-password' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(requestBody(api, `/api/users/${agentUser.id}`)).toEqual({
+        name: agentUser.name,
+        email: agentUser.email,
+        password: 'new-secret-password',
+      }),
+    );
+  });
+
+  it('validates a too-short new password', async () => {
+    const api = mockUsersApi();
+    const dialog = await openEditDialog();
+
+    fireEvent.change(within(dialog).getByLabelText('New password'), { target: { value: 'short' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    expect(await within(dialog).findByText(/at least 8 characters/)).toBeInTheDocument();
+    expect(requestBody(api, `/api/users/${agentUser.id}`)).toBeUndefined();
   });
 });

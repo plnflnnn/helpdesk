@@ -2,18 +2,13 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { APIError } from 'better-auth/api';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, Role, roleSchema } from '@helpdesk/shared';
-import type { Database } from './db.js';
-import type { Env } from './env.js';
+import type { Database } from '@/db.js';
+import type { AuthConfig } from '@/types.js';
 
 /** Sessions expire after this much inactivity. */
 export const SESSION_INACTIVITY_SECONDS = 60 * 60 * 12;
 /** While the user is active, the session expiry is pushed forward at most this often. */
 export const SESSION_REFRESH_SECONDS = 60 * 60;
-
-export type AuthConfig = Pick<
-  Env,
-  'NODE_ENV' | 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL' | 'APP_URL'
->;
 
 export function createAuth(db: Database, env: AuthConfig) {
   return betterAuth({
@@ -24,7 +19,7 @@ export function createAuth(db: Database, env: AuthConfig) {
     database: prismaAdapter(db, { provider: 'postgresql' }),
     emailAndPassword: {
       enabled: true,
-      // Users are created server-side (seed script, admin invites), never by public sign-up.
+      // Users are created server-side (seed script, admin users page), never by public sign-up.
       disableSignUp: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,
       maxPasswordLength: PASSWORD_MAX_LENGTH,

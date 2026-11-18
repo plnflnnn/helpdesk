@@ -9,7 +9,7 @@ const envSchema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
-  /** Public URL of the React app: trusted origin for auth requests and base of invite links. */
+  /** Public URL of the React app: the trusted origin for auth requests. */
   APP_URL: z.url().default('http://localhost:3000'),
 });
 

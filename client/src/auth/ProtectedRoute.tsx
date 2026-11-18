@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import type { Role } from '@helpdesk/shared';
 import { FullPageMessage } from '@/components/FullPageMessage';
-import { useCurrentUser } from './useAuth';
+import { useCurrentUser } from '@/auth/useAuth';
 
 /**
  * Renders children only for a signed-in user (with `role`, if given).

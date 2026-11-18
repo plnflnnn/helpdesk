@@ -6,6 +6,10 @@
     "types": ["node", "jest"],
     "rootDir": ".",
     "outDir": "dist",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@generated/*": ["./generated/*"]
+    },
     "noEmit": true
   },
   "include": ["src", "prisma", "generated", "prisma.config.ts"]

@@ -1,4 +1,4 @@
-import { parseEnv } from './env.js';
+import { parseEnv } from '@/env.js';
 
 const required = {
   DATABASE_URL: 'postgresql://user@localhost:5433/helpdesk',

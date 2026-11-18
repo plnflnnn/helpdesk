@@ -34,7 +34,6 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
-  invites       Invite[]
 
   @@map("users")
 }
@@ -57,7 +56,8 @@ model Session {
 model Account {
   id                    String    @id
   accountId             String
-  providerId            String
+  /// Sign-in is email/password only, so every account uses Better Auth's "credential" provider.
+  providerId            String    @default("credential")
   userId                String
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?
@@ -85,20 +85,4 @@ model Verification {
 
   @@index([identifier])
   @@map("verifications")
-}
-
-// App models.
-
-/// One-time link for a new agent to set their password. Only a SHA-256 hash of the token is stored.
-model Invite {
-  id        String    @id @default(cuid())
-  tokenHash String    @unique
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([userId])
-  @@map("invites")
 }

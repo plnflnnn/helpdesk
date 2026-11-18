@@ -1,15 +1,15 @@
 import { fileURLToPath } from 'node:url';
-import { createApp } from './app.js';
-import { createAuth } from './auth.js';
-import { createPrismaClient, isDatabaseUp } from './db.js';
-import { parseEnv } from './env.js';
+import { createApp } from '@/app.js';
+import { createAuth } from '@/auth.js';
+import { createPrismaClient, isDatabaseUp } from '@/db.js';
+import { parseEnv } from '@/env.js';
 
 const env = parseEnv(process.env);
 const db = createPrismaClient(env.DATABASE_URL);
 
 const app = createApp({
   checkDatabase: () => isDatabaseUp(db),
-  services: { db, auth: createAuth(db, env), appUrl: env.APP_URL },
+  services: { db, auth: createAuth(db, env) },
   clientDistPath:
     env.NODE_ENV === 'production'
       ? fileURLToPath(new URL('../../../client/dist', import.meta.url))
