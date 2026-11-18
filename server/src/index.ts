@@ -6,8 +6,10 @@ import { parseEnv } from '@/env.js';
 import { createJobQueue, startBoss } from '@/jobs/queue.js';
 import { createAiModel } from '@/services/ai.js';
 import { createMailer } from '@/services/email.js';
+import { initSentry } from '@/sentry.js';
 
 const env = parseEnv(process.env);
+initSentry(env, 'api');
 const db = createPrismaClient(env.DATABASE_URL);
 
 const mailer = createMailer(env);

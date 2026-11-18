@@ -1,9 +1,15 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config } from 'dotenv';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
+import webpack from 'webpack';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Build-time settings from the shared server/.env (or the shell). Only the CLIENT_* values used
+// below end up in the public bundle.
+config({ path: path.resolve(dirname, '../server/.env'), quiet: true });
 
 /** @returns {import('webpack').Configuration & { devServer?: import('webpack-dev-server').Configuration }} */
 export default (_env, argv) => {
@@ -41,6 +47,10 @@ export default (_env, argv) => {
     },
     plugins: [
       new HtmlWebpackPlugin({ template: './public/index.html' }),
+      new webpack.DefinePlugin({
+        __SENTRY_DSN__: JSON.stringify(process.env.CLIENT_SENTRY_DSN ?? ''),
+        __APP_ENV__: JSON.stringify(isProduction ? 'production' : 'development'),
+      }),
       ...(isProduction
         ? [new MiniCssExtractPlugin({ filename: 'assets/[name].[contenthash].css' })]
         : []),

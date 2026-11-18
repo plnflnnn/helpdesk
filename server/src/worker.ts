@@ -6,6 +6,7 @@ import { parseEnv } from '@/env.js';
 import { AUTO_RESOLVE_TICKET, CLASSIFY_TICKET, startBoss, type TicketJob } from '@/jobs/queue.js';
 import { createAiModel } from '@/services/ai.js';
 import { createMailer } from '@/services/email.js';
+import { captureException, initSentry } from '@/sentry.js';
 import { autoResolveTicket, loadKnowledgeBase } from '@/services/ticket-auto-resolve.js';
 import { classifyTicket } from '@/services/ticket-classification.js';
 
@@ -13,6 +14,7 @@ import { classifyTicket } from '@/services/ticket-classification.js';
 // or `start:worker` in production).
 
 const env = parseEnv(process.env);
+initSentry(env, 'worker');
 const db = createPrismaClient(env.DATABASE_URL);
 const mailer = createMailer(env);
 const boss = await startBoss(env.DATABASE_URL);
@@ -36,6 +38,7 @@ function ticketHandler(
       await run(ticketId, job!.signal);
     } catch (error) {
       console.error(`${task} ticket ${ticketId} failed (attempt ${job!.retryCount + 1})`, error);
+      captureException(error, { extra: { task, ticketId, attempt: job!.retryCount + 1 } });
       throw error;
     }
   };
