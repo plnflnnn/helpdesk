@@ -126,6 +126,8 @@ Steps:
    - Optional: `OPENAI_API_KEY`, `SENDGRID_INBOUND_SECRET` (`openssl rand -hex 24`), and the Sentry DSNs.
 3. Point SendGrid Inbound Parse at `https://<your-host>/webhooks/inbound?secret=<SENDGRID_INBOUND_SECRET>`.
 
+To skip the separate worker (Render background workers have no free plan), set `RUN_WORKER=true` and `OPENAI_API_KEY` on the web service: it then runs the jobs itself. Delete the worker service so that only one process consumes the queue (two would also work, but cost more).
+
 On the web service, `APP_URL` and `BETTER_AUTH_URL` default to its `onrender.com` URL. If you add a custom domain, set `APP_URL` on both services. `BETTER_AUTH_SECRET` is generated once and shared through the `helpdesk-shared` environment group.
 
 ## Project structure

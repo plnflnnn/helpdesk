@@ -24,6 +24,8 @@ const envSchema = z.object({
   SENDGRID_INBOUND_SECRET: z.string().min(16).optional(),
   /** Markdown file the AI answers new tickets from; relative paths are from the server folder. */
   KNOWLEDGE_BASE_PATH: z.string().min(1).default('knowledge-base.md'),
+  /** Run the background jobs in the web server too, instead of only in a separate worker process. */
+  RUN_WORKER: z.stringbool().default(false),
   /** Sentry DSN for server error reporting (API and worker). Without it, errors are only logged. */
   SERVER_SENTRY_DSN: z.url().optional(),
 });

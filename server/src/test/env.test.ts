@@ -16,8 +16,14 @@ describe('parseEnv', () => {
       APP_URL: 'http://localhost:3000',
       OPENAI_MODEL: 'gpt-5-mini',
       KNOWLEDGE_BASE_PATH: 'knowledge-base.md',
+      RUN_WORKER: false,
       ...required,
     });
+  });
+
+  it('parses RUN_WORKER as a boolean', () => {
+    expect(parseEnv({ ...required, RUN_WORKER: 'true' }).RUN_WORKER).toBe(true);
+    expect(parseEnv({ ...required, RUN_WORKER: 'false' }).RUN_WORKER).toBe(false);
   });
 
   it('throws when DATABASE_URL is missing', () => {

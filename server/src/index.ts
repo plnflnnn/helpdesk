@@ -4,6 +4,7 @@ import { createAuth } from '@/auth.js';
 import { createPrismaClient, isDatabaseUp } from '@/db.js';
 import { parseEnv } from '@/env.js';
 import { createJobQueue, startBoss } from '@/jobs/queue.js';
+import { startJobWorkers } from '@/jobs/workers.js';
 import { createAiModel } from '@/services/ai.js';
 import { createMailer } from '@/services/email.js';
 import { initSentry } from '@/sentry.js';
@@ -14,8 +15,13 @@ const db = createPrismaClient(env.DATABASE_URL);
 
 const mailer = createMailer(env);
 
-// The web server only sends jobs; the worker (`npm run dev:worker` / `start:worker`) runs them.
+// The web server sends jobs; the worker (`npm run dev:worker` / `start:worker`) runs them. With
+// RUN_WORKER, the web server runs them too, so a deployment needs no separate worker service.
 const boss = await startBoss(env.DATABASE_URL);
+if (env.RUN_WORKER) {
+  await startJobWorkers({ boss, db, mailer, env });
+  console.log('Job worker started in the web process');
+}
 
 const app = createApp({
   checkDatabase: () => isDatabaseUp(db),
