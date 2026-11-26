@@ -20,7 +20,7 @@ An AI-powered support ticket system for an online course platform. Student email
 - pg-boss (Postgres-backed background job queue, run inside the API server)
 - Vercel AI SDK + OpenAI (classification, summaries, auto-replies, reply polishing)
 - SendGrid (Inbound Parse webhook for incoming email, Mail Send for replies)
-- Multer (email attachments)
+- Multer (parses the Inbound Parse form; attachments are not stored)
 
 **Shared and tooling**
 
@@ -66,7 +66,7 @@ Then run `npm run dev` and open http://localhost:3000.
 
 ## Live demo
 
-Try it at https://helpdesk-v0j3.onrender.com with the guest agent account:
+Try it at https://helpdesk-theta-nine.vercel.app with the guest agent account:
 
 | Email                       | Password          |
 | --------------------------- | ----------------- |
@@ -137,6 +137,34 @@ On Vercel the API runs as one serverless function (`api/index.js` → `server/sr
 
 `APP_URL` and `BETTER_AUTH_URL` default to the production domain (`*.vercel.app`). Set `APP_URL` when you add a custom domain. Vercel limits request bodies to 4.5 MB, so inbound emails with larger attachments are rejected.
 
+## Test the inbound email webhook
+
+You can send a fake student email to the webhook with curl, without setting up SendGrid's inbound side. The question below is answered in [server/knowledge-base.md](server/knowledge-base.md), so with `OPENAI_API_KEY` set the AI should reply and resolve the ticket within about 30 seconds.
+
+```sh
+APP_URL="http://localhost:4000"          # or your deployed URL, e.g. https://<project>.vercel.app
+SECRET="<SENDGRID_INBOUND_SECRET>"       # the webhook rejects every request while it is empty
+STUDENT_NAME="<student-name>"
+STUDENT_EMAIL="<student-email>"          # use your own inbox to receive the AI reply
+
+curl -i -X POST "$APP_URL/webhooks/inbound?secret=$SECRET" \
+  --form-string "from=$STUDENT_NAME <$STUDENT_EMAIL>" \
+  --form-string "to=support@yourdomain.com" \
+  --form-string "subject=I forgot my password" \
+  --form-string "text=Hi, I forgot my password and can't log in to my courses. What should I do?" \
+  --form-string "headers=Message-ID: <test-$(date +%s)-$RANDOM@example.com>"
+```
+
+Responses:
+
+- `{"outcome":"created", ...}`: a new ticket was created, and classification and auto-resolve were queued.
+- `{"outcome":"threaded", ...}`: the email was added as a reply to the student's existing ticket.
+- `{"outcome":"duplicate"}`: an email with this `Message-ID` was already received.
+- `{"outcome":"ignored"}`: the `from` field has no valid address. Keep the angle brackets: `Name <email>`.
+- `401`: the secret doesn't match `SENDGRID_INBOUND_SECRET`.
+
+Auto-resolve only answers a student's first message on a new, untouched ticket. A question the knowledge base doesn't cover (for example, team discounts) should leave the ticket open for agents. Each run needs a new `Message-ID`, or the email is treated as a duplicate.
+
 ## Project structure
 
 ```
@@ -145,6 +173,8 @@ server/   Express API and background jobs, Prisma schema and migrations, knowled
 shared/   Zod schemas and types used by client and server
 e2e/      Playwright tests
 ```
+
+Inside `server/src`, routes hold the request logic and use the `prisma` and `auth` singletons directly. Shared code, background jobs and the queue live in `lib/`, and auth checks in `middleware/`. [CLAUDE.md](CLAUDE.md) describes the conventions.
 
 ## Users
 
