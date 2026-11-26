@@ -11,4 +11,4 @@ export function initSentry(env: Env, serverName: 'api' | 'worker') {
   });
 }
 
-export { captureException } from '@sentry/node';
+export { captureException, flush } from '@sentry/node';

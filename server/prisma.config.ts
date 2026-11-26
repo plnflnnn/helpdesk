@@ -12,6 +12,8 @@ export default defineConfig({
   },
   datasource: {
     // `prisma generate` does not need a database, so allow it to run without DATABASE_URL.
-    url: process.env.DATABASE_URL ?? '',
+    // Migrations need a direct connection: on Neon, DATABASE_URL goes through its connection pooler
+    // and DATABASE_URL_UNPOOLED does not.
+    url: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL || '',
   },
 });

@@ -33,9 +33,10 @@ const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 export function parseEnv(source: NodeJS.ProcessEnv): Env {
-  // In production the app and API share one origin, so the URLs fall back to each other and to
-  // RENDER_EXTERNAL_URL (set by Render on web services, e.g. https://helpdesk.onrender.com).
-  const appUrl = source.APP_URL || source.RENDER_EXTERNAL_URL || undefined;
+  // In production the app and API share one origin, so the URLs fall back to each other and to the
+  // host's own URL: RENDER_EXTERNAL_URL on Render (e.g. https://helpdesk.onrender.com), or on Vercel
+  // the production domain (VERCEL_PROJECT_PRODUCTION_URL) or a preview's URL (VERCEL_URL).
+  const appUrl = source.APP_URL || source.RENDER_EXTERNAL_URL || vercelUrl(source) || undefined;
   const result = envSchema.safeParse({
     ...source,
     APP_URL: appUrl,
@@ -45,4 +46,11 @@ export function parseEnv(source: NodeJS.ProcessEnv): Env {
     throw new Error(`Invalid environment variables:\n${z.prettifyError(result.error)}`);
   }
   return result.data;
+}
+
+/** The deployment's public URL on Vercel, which sets these variables without the scheme. */
+function vercelUrl(source: NodeJS.ProcessEnv) {
+  const host =
+    source.VERCEL_ENV === 'production' ? source.VERCEL_PROJECT_PRODUCTION_URL : source.VERCEL_URL;
+  return host ? `https://${host}` : undefined;
 }

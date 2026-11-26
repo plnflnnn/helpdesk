@@ -130,6 +130,18 @@ To skip the separate worker (Render background workers have no free plan), set `
 
 On the web service, `APP_URL` and `BETTER_AUTH_URL` default to its `onrender.com` URL. If you add a custom domain, set `APP_URL` on both services. `BETTER_AUTH_SECRET` is generated once and shared through the `helpdesk-shared` environment group.
 
+## Deploy to Vercel
+
+On Vercel the API runs as one serverless function (`api/index.js` → `server/src/vercel.ts`), and Vercel's CDN serves the React app (`vercel.json`). There is no long-running worker, so the ticket jobs (AI classification and auto-resolve) run right after the response through `waitUntil`, retrying twice, instead of through pg-boss. A job that still fails leaves the ticket for agents.
+
+1. In Vercel, import the repo (keep the root directory, settings come from `vercel.json`).
+2. Under **Storage**, create a **Neon** Postgres database or connect an existing one. This sets `DATABASE_URL` (pooled, used by the app) and `DATABASE_URL_UNPOOLED` (direct, used by migrations). If you set them by hand, take the direct URL from Neon with connection pooling turned off.
+3. Add the environment variables: `BETTER_AUTH_SECRET` (`openssl rand -base64 32`), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, and optionally `OPENAI_API_KEY`, `SENDGRID_INBOUND_SECRET`, and the Sentry DSNs.
+4. Deploy. The build applies migrations and creates the admin.
+5. Point SendGrid Inbound Parse at `https://<your-domain>/webhooks/inbound?secret=<SENDGRID_INBOUND_SECRET>`.
+
+`APP_URL` and `BETTER_AUTH_URL` default to the production domain (`*.vercel.app`). Set `APP_URL` when you add a custom domain. Vercel limits request bodies to 4.5 MB, so inbound emails with larger attachments are rejected.
+
 ## Project structure
 
 ```
