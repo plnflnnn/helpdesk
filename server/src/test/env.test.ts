@@ -47,6 +47,31 @@ describe('parseEnv', () => {
     expect(env.BETTER_AUTH_URL).toBe('https://helpdesk.onrender.com');
   });
 
+  it('defaults APP_URL to the Vercel production domain in production', () => {
+    const env = parseEnv({
+      DATABASE_URL: required.DATABASE_URL,
+      BETTER_AUTH_SECRET: required.BETTER_AUTH_SECRET,
+      VERCEL_ENV: 'production',
+      VERCEL_PROJECT_PRODUCTION_URL: 'helpdesk.vercel.app',
+      VERCEL_URL: 'helpdesk-abc123.vercel.app',
+    });
+
+    expect(env.APP_URL).toBe('https://helpdesk.vercel.app');
+    expect(env.BETTER_AUTH_URL).toBe('https://helpdesk.vercel.app');
+  });
+
+  it('defaults APP_URL to the deployment URL on Vercel previews', () => {
+    const env = parseEnv({
+      DATABASE_URL: required.DATABASE_URL,
+      BETTER_AUTH_SECRET: required.BETTER_AUTH_SECRET,
+      VERCEL_ENV: 'preview',
+      VERCEL_PROJECT_PRODUCTION_URL: 'helpdesk.vercel.app',
+      VERCEL_URL: 'helpdesk-abc123.vercel.app',
+    });
+
+    expect(env.APP_URL).toBe('https://helpdesk-abc123.vercel.app');
+  });
+
   it('defaults BETTER_AUTH_URL to APP_URL', () => {
     const env = parseEnv({
       DATABASE_URL: required.DATABASE_URL,
