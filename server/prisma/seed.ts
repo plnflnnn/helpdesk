@@ -15,8 +15,8 @@ import {
   TicketStatus,
   type TicketCategory,
 } from '@helpdesk/shared';
-import { createPrismaClient, type Database } from '@/db.js';
-import { createUser } from '@/services/users.js';
+import prisma from '@/db.js';
+import { createUser } from '@/lib/create-user.js';
 import { demoTickets } from './demo-tickets.js';
 import { createRandom } from './random.js';
 
@@ -43,7 +43,7 @@ function parseSeedEnv() {
 
 async function main() {
   const env = parseSeedEnv();
-  const db = createPrismaClient(env.DATABASE_URL);
+  const db = prisma;
 
   try {
     const adminId = await seedAdmin(db, env);
@@ -56,7 +56,7 @@ async function main() {
 }
 
 /** Creates the admin, or makes the existing user with that email an active admin. Returns its id. */
-async function seedAdmin(db: Database, env: SeedEnv): Promise<string> {
+async function seedAdmin(db: typeof prisma, env: SeedEnv): Promise<string> {
   const existing = await db.user.findUnique({ where: { email: env.ADMIN_EMAIL } });
   if (existing) {
     await db.user.update({
@@ -68,13 +68,10 @@ async function seedAdmin(db: Database, env: SeedEnv): Promise<string> {
   }
 
   const admin = await createUser({
-    db,
-    data: {
-      name: env.ADMIN_NAME,
-      email: env.ADMIN_EMAIL,
-      password: env.ADMIN_PASSWORD,
-      role: Role.admin,
-    },
+    name: env.ADMIN_NAME,
+    email: env.ADMIN_EMAIL,
+    password: env.ADMIN_PASSWORD,
+    role: Role.admin,
   });
   console.log(`Created admin ${env.ADMIN_EMAIL}.`);
   return admin.id;
@@ -88,16 +85,13 @@ const demoAgents = [
 ];
 
 /** Demo agents (created if missing) and, while there are no tickets yet, the demo tickets. */
-async function seedDemoData(db: Database, env: SeedEnv, adminId: string) {
+async function seedDemoData(db: typeof prisma, env: SeedEnv, adminId: string) {
   const agentIds: string[] = [];
   for (const agent of demoAgents) {
     const existing = await db.user.findUnique({ where: { email: agent.email } });
     const user =
       existing ??
-      (await createUser({
-        db,
-        data: { ...agent, password: env.DEMO_AGENT_PASSWORD, role: Role.agent },
-      }));
+      (await createUser({ ...agent, password: env.DEMO_AGENT_PASSWORD, role: Role.agent }));
     agentIds.push(user.id);
   }
 

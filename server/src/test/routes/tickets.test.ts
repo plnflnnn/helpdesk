@@ -1,5 +1,4 @@
 import { jest } from '@jest/globals';
-import { MockLanguageModelV4 } from 'ai/test';
 import {
   listAssigneesResponseSchema,
   listTicketsResponseSchema,
@@ -7,31 +6,20 @@ import {
   ticketResponseSchema,
   type TicketListItem,
 } from '@helpdesk/shared';
-import type { Mailer } from '@/services/email.js';
-import { createTestContext } from '@/test/context.js';
+import type { sendEmail } from '@/lib/send-email.js';
+import { doGenerate, mockAi, model, modelReply } from '@/test/mock-ai.js';
 
-type GenerateResult = Awaited<ReturnType<MockLanguageModelV4['doGenerate']>>;
+const send = jest.fn<typeof sendEmail>();
+jest.unstable_mockModule('@/lib/send-email.js', () => ({ sendEmail: send }));
+mockAi();
+const { createTestContext } = await import('@/test/context.js');
 
-/** A model reply with the given text, in the shape the AI SDK expects. */
-const modelReply = (text: string): GenerateResult => ({
-  content: [{ type: 'text', text }],
-  finishReason: { unified: 'stop', raw: 'stop' },
-  usage: {
-    inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
-    outputTokens: { total: 5, text: 5, reasoning: 0 },
-  },
-  warnings: [],
-});
-
-const doGenerate = jest.fn<MockLanguageModelV4['doGenerate']>();
-const aiModel = new MockLanguageModelV4({ doGenerate });
-const send = jest.fn<Mailer['send']>();
-const ctx = createTestContext({ aiModel, mailer: { from: 'support@example.com', send } });
+const ctx = createTestContext();
 
 beforeEach(async () => {
   doGenerate.mockReset();
   send.mockReset();
-  aiModel.doGenerateCalls.length = 0;
+  model.doGenerateCalls.length = 0;
   await ctx.reset();
 });
 afterAll(() => ctx.close());

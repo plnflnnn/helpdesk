@@ -1,19 +1,20 @@
 import { Router } from 'express';
-import { dashboardQuerySchema, type DashboardResponse } from '@helpdesk/shared';
-import { requireAuth } from '@/middleware/auth.js';
-import { validate } from '@/middleware/validate.js';
-import { getDashboardStats } from '@/services/dashboard.js';
-import type { Services } from '@/types.js';
+import { DASHBOARD_DAYS, dashboardQuerySchema, dashboardStatsSchema } from '@helpdesk/shared';
+import prisma from '@/db.js';
+import { validate } from '@/lib/validate.js';
+import { requireAuth } from '@/middleware/require-auth.js';
 
-/** Ticket metrics for the dashboard, available to every signed-in agent and admin. */
-export function dashboardRouter({ db, auth }: Services) {
-  const router = Router();
-  router.use(requireAuth(auth));
+const router = Router();
 
-  router.get('/', validate({ query: dashboardQuerySchema }), async (req, res) => {
-    const body: DashboardResponse = { stats: await getDashboardStats(db, req.query.timeZone) };
-    res.json(body);
-  });
+/** Ticket metrics from the `dashboard_stats` database function (see its migration). */
+router.get('/', requireAuth, async (req, res) => {
+  const query = validate(dashboardQuerySchema, req.query, res);
+  if (!query) return;
 
-  return router;
-}
+  // `timeZone` decides where each day starts in the tickets-per-day chart.
+  const [row] = await prisma.$queryRaw<[{ stats: unknown }]>`
+    SELECT dashboard_stats(${query.timeZone}, ${DASHBOARD_DAYS}::int) AS stats`;
+  res.json({ stats: dashboardStatsSchema.parse(row.stats) });
+});
+
+export default router;

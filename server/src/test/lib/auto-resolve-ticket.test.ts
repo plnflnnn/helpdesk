@@ -1,32 +1,23 @@
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { jest } from '@jest/globals';
-import { MockLanguageModelV4 } from 'ai/test';
-import type { Mailer } from '@/services/email.js';
-import {
-  AI_SENDER_NAME,
-  autoResolveTicket,
-  type AutoResolveDecision,
-} from '@/services/ticket-auto-resolve.js';
-import { createTestContext } from '@/test/context.js';
-
-type GenerateResult = Awaited<ReturnType<MockLanguageModelV4['doGenerate']>>;
-
-const modelReply = (decision: AutoResolveDecision): GenerateResult => ({
-  content: [{ type: 'text', text: JSON.stringify(decision) }],
-  finishReason: { unified: 'stop', raw: 'stop' },
-  usage: {
-    inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
-    outputTokens: { total: 5, text: 5, reasoning: 0 },
-  },
-  warnings: [],
-});
+import type { sendEmail } from '@/lib/send-email.js';
+import { doGenerate, mockAi, modelReply } from '@/test/mock-ai.js';
 
 const KNOWLEDGE_BASE = '## Certificates\nA certificate is issued upon course completion.';
 const ANSWER = 'Hi Mia,\n\nYour certificate is in your dashboard.\n\nBest regards,\nSupport Team';
 
-const doGenerate = jest.fn<MockLanguageModelV4['doGenerate']>();
-const model = new MockLanguageModelV4({ doGenerate });
-const send = jest.fn<Mailer['send']>();
-const mailer: Mailer = { from: 'support@example.com', send };
+const knowledgeBaseFile = path.join(await mkdtemp(path.join(tmpdir(), 'kb-')), 'kb.md');
+await writeFile(knowledgeBaseFile, KNOWLEDGE_BASE);
+process.env.KNOWLEDGE_BASE_PATH = knowledgeBaseFile;
+
+const send = jest.fn<typeof sendEmail>();
+jest.unstable_mockModule('@/lib/send-email.js', () => ({ sendEmail: send }));
+mockAi();
+const { AI_SENDER_NAME, autoResolveTicket } = await import('@/lib/auto-resolve-ticket.js');
+const { createTestContext } = await import('@/test/context.js');
+
 const ctx = createTestContext();
 
 beforeEach(async () => {
@@ -52,8 +43,7 @@ async function createTicket() {
   });
 }
 
-const run = (ticketId: number, signal?: AbortSignal) =>
-  autoResolveTicket({ db: ctx.db, model, mailer, knowledgeBase: KNOWLEDGE_BASE, ticketId, signal });
+const run = (ticketId: number, signal?: AbortSignal) => autoResolveTicket(ticketId, signal);
 
 const findTicket = (id: number) =>
   ctx.db.ticket.findUniqueOrThrow({
@@ -64,7 +54,7 @@ const findTicket = (id: number) =>
 describe('autoResolveTicket', () => {
   it('emails the answer and resolves the ticket', async () => {
     const { id } = await createTicket();
-    doGenerate.mockResolvedValue(modelReply({ resolvable: true, reply: ANSWER }));
+    doGenerate.mockResolvedValue(modelReply(JSON.stringify({ resolvable: true, reply: ANSWER })));
 
     expect(await run(id)).toBe('resolved');
 
@@ -96,7 +86,7 @@ describe('autoResolveTicket', () => {
     const controller = new AbortController();
     doGenerate.mockImplementation(async () => {
       controller.abort(new Error('Job expired'));
-      return modelReply({ resolvable: true, reply: ANSWER });
+      return modelReply(JSON.stringify({ resolvable: true, reply: ANSWER }));
     });
 
     await expect(run(id, controller.signal)).rejects.toThrow('Job expired');
@@ -107,7 +97,7 @@ describe('autoResolveTicket', () => {
 
   it('leaves the ticket to agents when the knowledge base does not answer it', async () => {
     const { id } = await createTicket();
-    doGenerate.mockResolvedValue(modelReply({ resolvable: false, reply: '' }));
+    doGenerate.mockResolvedValue(modelReply(JSON.stringify({ resolvable: false, reply: '' })));
 
     expect(await run(id)).toBe('skipped');
 
@@ -131,7 +121,7 @@ describe('autoResolveTicket', () => {
       await ctx.db.message.create({
         data: { ticketId: id, direction: 'outbound', bodyText: 'On it!' },
       });
-      return modelReply({ resolvable: true, reply: ANSWER });
+      return modelReply(JSON.stringify({ resolvable: true, reply: ANSWER }));
     });
 
     expect(await run(id)).toBe('skipped');
@@ -142,7 +132,7 @@ describe('autoResolveTicket', () => {
 
   it('throws and leaves the ticket open when the email cannot be sent, so the job is retried', async () => {
     const { id } = await createTicket();
-    doGenerate.mockResolvedValue(modelReply({ resolvable: true, reply: ANSWER }));
+    doGenerate.mockResolvedValue(modelReply(JSON.stringify({ resolvable: true, reply: ANSWER })));
     send.mockRejectedValue(new Error('SendGrid is down'));
 
     await expect(run(id)).rejects.toThrow('SendGrid is down');

@@ -17,6 +17,8 @@ export default {
     // Test against shared source directly so tests don't depend on a shared build.
     '^@helpdesk/shared$': '<rootDir>/../shared/src/index.ts',
   },
+  // Sets the test environment variables before each test file.
+  setupFiles: ['<rootDir>/src/test/setup-env.ts'],
   // Applies migrations to the test database once per run.
   globalSetup: '<rootDir>/src/test/global-setup.ts',
   // Integration tests share one database.

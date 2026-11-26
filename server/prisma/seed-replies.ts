@@ -8,7 +8,7 @@
 import { config } from 'dotenv';
 import { z } from 'zod';
 import { TicketStatus, type TicketCategory } from '@helpdesk/shared';
-import { createPrismaClient, type Database } from '@/db.js';
+import prisma from '@/db.js';
 import { createRandom } from './random.js';
 
 config({ quiet: true });
@@ -122,7 +122,7 @@ async function main() {
     return;
   }
 
-  const db = createPrismaClient(env.DATABASE_URL);
+  const db = prisma;
   try {
     await seedReplies(db);
   } finally {
@@ -130,7 +130,7 @@ async function main() {
   }
 }
 
-async function seedReplies(db: Database) {
+async function seedReplies(db: typeof prisma) {
   const random = createRandom(7);
 
   // Fallback author for a resolved ticket that has no assignee.

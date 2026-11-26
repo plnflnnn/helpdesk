@@ -1,98 +1,165 @@
 import { Router } from 'express';
-import {
-  listTicketsQuerySchema,
-  replyInputSchema,
-  ticketIdParamsSchema,
-  updateTicketInputSchema,
-  type ListAssigneesResponse,
-  type ListTicketsResponse,
-  type PolishReplyResponse,
-  type TicketResponse,
-  type TicketSummaryResponse,
-} from '@helpdesk/shared';
-import { requireAuth } from '@/middleware/auth.js';
-import { validate } from '@/middleware/validate.js';
-import {
-  addReply,
-  getTicket,
-  listAssignees,
-  listTickets,
-  updateTicket,
-} from '@/services/tickets.js';
-import { polishReply } from '@/services/reply-polish.js';
-import { summarizeTicket } from '@/services/ticket-summary.js';
-import type { Services } from '@/types.js';
+import { listTicketsQuerySchema, updateTicketInputSchema } from '@helpdesk/shared';
+import type { Prisma } from '@generated/prisma/client.js';
+import prisma from '@/db.js';
+import { askAi, formatConversation } from '@/lib/ai.js';
+import { parseId } from '@/lib/parse-id.js';
+import { findTicket, ticketListSelect } from '@/lib/tickets.js';
+import { validate } from '@/lib/validate.js';
+import { requireAuth } from '@/middleware/require-auth.js';
 
-/** Tickets, available to every signed-in agent and admin. */
-export function ticketsRouter({ db, auth, aiModel, mailer }: Services) {
-  const router = Router();
-  router.use(requireAuth(auth));
+const SUMMARY_INSTRUCTIONS = `You help customer support agents of an online course platform get up to speed on a ticket quickly.
+You receive a support ticket and its full conversation between the student and the support agents.
+Summarize it for an agent who is about to work on the ticket.
 
-  router.get('/', validate({ query: listTicketsQuerySchema }), async (req, res) => {
-    const body: ListTicketsResponse = await listTickets(db, req.query);
-    res.json(body);
+Write:
+- One or two sentences on what the student needs and why.
+- Then up to 4 short bullet points (starting with "- ") covering what has been done or said so far, and what is still open or the next step.
+
+Rules:
+- Be concise and factual; use only information in the conversation. Never guess or invent details.
+- Mention concrete details that matter (order numbers, course names, dates, error messages).
+- Write in English, in plain text: no Markdown other than the "- " bullets, no headings, no commentary.`;
+
+/** Active, not deleted: everyone a ticket can be assigned to. */
+const assignable = { active: true, deletedAt: null } as const satisfies Prisma.UserWhereInput;
+
+const router = Router();
+router.use(requireAuth);
+
+router.get('/', async (req, res) => {
+  const query = validate(listTicketsQuerySchema, req.query, res);
+  if (!query) return;
+
+  const { search, status, category, sortBy, sortOrder, page, pageSize } = query;
+  const where: Prisma.TicketWhereInput = { status, category };
+  if (search) {
+    const contains = { contains: search, mode: 'insensitive' } as const;
+    where.OR = [
+      { subject: contains },
+      { student: { email: contains } },
+      { student: { name: contains } },
+      { messages: { some: { bodyText: contains } } },
+    ];
+  }
+
+  // Ties go to the newest ticket; students without a name are told apart by email.
+  const orderBy: Prisma.TicketOrderByWithRelationInput[] =
+    sortBy === 'student'
+      ? [
+          { student: { name: { sort: sortOrder, nulls: 'last' } } },
+          { student: { email: sortOrder } },
+        ]
+      : [{ [sortBy]: sortOrder }];
+  orderBy.push({ id: 'desc' });
+
+  const [tickets, total] = await prisma.$transaction([
+    prisma.ticket.findMany({
+      where,
+      select: ticketListSelect,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.ticket.count({ where }),
+  ]);
+  res.json({ tickets, total });
+});
+
+// Before `/:id`, so "assignees" isn't read as a ticket id.
+router.get('/assignees', async (_req, res) => {
+  const assignees = await prisma.user.findMany({
+    where: assignable,
+    select: { id: true, name: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
   });
+  res.json({ assignees });
+});
 
-  // Registered before `/:id` so "assignees" isn't read as a ticket id.
-  router.get('/assignees', async (_req, res) => {
-    const body: ListAssigneesResponse = { assignees: await listAssignees(db) };
-    res.json(body);
+router.get('/:id', async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) {
+    res.status(400).json({ error: 'Invalid ticket ID' });
+    return;
+  }
+
+  const ticket = await findTicket(id);
+  if (!ticket) {
+    res.status(404).json({ error: 'Ticket not found' });
+    return;
+  }
+  res.json({ ticket });
+});
+
+router.patch('/:id', async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) {
+    res.status(400).json({ error: 'Invalid ticket ID' });
+    return;
+  }
+  const data = validate(updateTicketInputSchema, req.body, res);
+  if (!data) return;
+
+  if (data.assigneeId) {
+    const assignee = await prisma.user.findFirst({ where: { id: data.assigneeId, ...assignable } });
+    if (!assignee) {
+      res.status(400).json({ error: 'This agent does not exist or is inactive' });
+      return;
+    }
+  }
+
+  // Resolving records when (closing keeps the first time); reopening clears it.
+  const reopened = data.status === 'open' || data.status === 'pending';
+  const resolved = data.status === 'resolved' || data.status === 'closed';
+  const [{ count }] = await prisma.$transaction([
+    prisma.ticket.updateMany({
+      where: { id },
+      data: { ...data, ...(reopened && { resolvedAt: null }) },
+    }),
+    ...(resolved
+      ? [
+          prisma.ticket.updateMany({
+            where: { id, resolvedAt: null },
+            data: { resolvedAt: new Date() },
+          }),
+        ]
+      : []),
+  ]);
+  if (count === 0) {
+    res.status(404).json({ error: 'Ticket not found' });
+    return;
+  }
+  res.json({ ticket: await findTicket(id) });
+});
+
+// A POST because each call runs the AI and may give a different summary. Nothing is saved.
+router.post('/:id/summary', async (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) {
+    res.status(400).json({ error: 'Invalid ticket ID' });
+    return;
+  }
+
+  const ticket = await findTicket(id);
+  if (!ticket) {
+    res.status(404).json({ error: 'Ticket not found' });
+    return;
+  }
+
+  const summary = await askAi(res, {
+    instructions: SUMMARY_INSTRUCTIONS,
+    prompt: `Ticket subject: ${ticket.subject}
+Status: ${ticket.status}
+Student: ${ticket.student.name ?? ticket.student.email}
+
+<conversation>
+${formatConversation(ticket)}
+</conversation>`,
+    task: 'summarize the ticket',
   });
+  if (summary === null) return;
 
-  router.get('/:id', validate({ params: ticketIdParamsSchema }), async (req, res) => {
-    const body: TicketResponse = { ticket: await getTicket(db, req.params.id) };
-    res.json(body);
-  });
+  res.json({ summary });
+});
 
-  router.patch(
-    '/:id',
-    validate({ params: ticketIdParamsSchema, body: updateTicketInputSchema }),
-    async (req, res) => {
-      const ticket = await updateTicket({ db, ticketId: req.params.id, data: req.body });
-      const body: TicketResponse = { ticket };
-      res.json(body);
-    },
-  );
-
-  router.post(
-    '/:id/replies',
-    validate({ params: ticketIdParamsSchema, body: replyInputSchema }),
-    async (req, res) => {
-      const ticket = await addReply({
-        db,
-        mailer,
-        ticketId: req.params.id,
-        author: req.user!,
-        bodyText: req.body.bodyText,
-      });
-      const body: TicketResponse = { ticket };
-      res.status(201).json(body);
-    },
-  );
-
-  // A POST because each call runs the AI and may give a different summary; nothing is saved.
-  router.post('/:id/summary', validate({ params: ticketIdParamsSchema }), async (req, res) => {
-    const summary = await summarizeTicket({ db, model: aiModel, ticketId: req.params.id });
-    const body: TicketSummaryResponse = { summary };
-    res.json(body);
-  });
-
-  // Returns an improved version of the agent's draft; nothing is saved.
-  router.post(
-    '/:id/replies/polish',
-    validate({ params: ticketIdParamsSchema, body: replyInputSchema }),
-    async (req, res) => {
-      const bodyText = await polishReply({
-        db,
-        model: aiModel,
-        ticketId: req.params.id,
-        agentName: req.user!.name,
-        draft: req.body.bodyText,
-      });
-      const body: PolishReplyResponse = { bodyText };
-      res.json(body);
-    },
-  );
-
-  return router;
-}
+export default router;

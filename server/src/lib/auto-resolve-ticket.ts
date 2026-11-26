@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
-import { generateText, Output, type LanguageModel } from 'ai';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { generateText, Output } from 'ai';
 import { z } from 'zod';
-import type { Database } from '@/db.js';
-import { formatConversation } from '@/services/ai.js';
-import type { Mailer } from '@/services/email.js';
-import { emailReply, getTicket } from '@/services/tickets.js';
+import prisma from '@/db.js';
+import { aiModel, formatConversation } from '@/lib/ai.js';
+import { emailReply } from '@/lib/email-reply.js';
+import { findTicket } from '@/lib/tickets.js';
 
 /** Sender name on replies the AI sends. */
 export const AI_SENDER_NAME = 'Support Team';
@@ -28,54 +30,45 @@ const decisionSchema = z.object({
   reply: z.string(),
 });
 
-export type AutoResolveDecision = z.infer<typeof decisionSchema>;
+// The server folder, whether running from src/lib/ (tsx) or dist/src/lib/ (build).
+const serverDir = fileURLToPath(
+  new URL(import.meta.url.includes('/dist/') ? '../../..' : '../..', import.meta.url),
+);
+let knowledgeBase: Promise<string | null> | undefined;
 
-/** The knowledge base Markdown, or null (with a warning) when the file can't be read. */
-export async function loadKnowledgeBase(path: string): Promise<string | null> {
-  try {
-    const text = (await readFile(path, 'utf8')).trim();
-    return text || null;
-  } catch (error) {
-    console.warn(`Could not read the knowledge base at ${path}`, error);
-    return null;
-  }
+function loadKnowledgeBase() {
+  const file = path.resolve(serverDir, process.env.KNOWLEDGE_BASE_PATH || 'knowledge-base.md');
+  knowledgeBase ??= readFile(file, 'utf8').then(
+    (text) => text.trim() || null,
+    (error) => {
+      console.warn(`Could not read the knowledge base at ${file}`, error);
+      return null;
+    },
+  );
+  return knowledgeBase;
 }
 
-type AutoResolveTicketParams = {
-  db: Database;
-  model: LanguageModel;
-  mailer: Mailer;
-  knowledgeBase: string;
-  ticketId: number;
-  /** Aborts the job, e.g. when it times out: the AI call stops and no email is sent. */
-  signal?: AbortSignal;
-};
-
 /**
- * Tries to answer a new ticket from the knowledge base. When the AI can fully answer it, emails the
- * reply to the student and resolves the ticket. Otherwise leaves the ticket for agents.
- *
- * Only touches a ticket nobody has picked up: still open, unassigned, with just the student's first
- * email. Throws when the AI or the email fails, so the job is retried.
+ * Answers a new ticket from the knowledge base when the AI can fully resolve it: emails the reply
+ * and resolves the ticket. Only touches a ticket nobody has picked up. Throws when the AI or the
+ * email fails, so the job is retried.
  */
-export async function autoResolveTicket({
-  db,
-  model,
-  mailer,
-  knowledgeBase,
-  ticketId,
-  signal,
-}: AutoResolveTicketParams): Promise<'resolved' | 'skipped'> {
-  if (!(await isUntouched(db, ticketId))) {
+export async function autoResolveTicket(
+  ticketId: number,
+  signal?: AbortSignal,
+): Promise<'resolved' | 'skipped'> {
+  const model = aiModel();
+  const kb = await loadKnowledgeBase();
+  const ticket = await findTicket(ticketId);
+  if (!model || !kb || !ticket || !(await isUntouched(ticketId))) {
     return 'skipped';
   }
 
-  const ticket = await getTicket(db, ticketId);
   const { output } = await generateText({
     model,
     instructions: INSTRUCTIONS,
     prompt: `<knowledge_base>
-${knowledgeBase}
+${kb}
 </knowledge_base>
 
 Student: ${ticket.student.name ?? 'unknown name'} <${ticket.student.email}>
@@ -85,32 +78,23 @@ Subject: ${ticket.subject}
 ${formatConversation(ticket)}
 </conversation>`,
     output: Output.object({ schema: decisionSchema }),
-    maxRetries: 0, // pg-boss retries the whole job.
+    maxRetries: 0, // The queue retries the whole job.
     timeout: 60_000,
     abortSignal: signal,
   });
   const reply = output.reply.trim();
-  if (!output.resolvable || !reply) {
-    return 'skipped';
-  }
 
   // An agent may have picked the ticket up while the AI was thinking.
-  if (!(await isUntouched(db, ticketId))) {
+  if (!output.resolvable || !reply || !(await isUntouched(ticketId))) {
     return 'skipped';
   }
-  // A job that ran past its timeout is retried by pg-boss: sending now could email the student twice.
+  // A timed-out job is retried: sending now could email the student twice.
   signal?.throwIfAborted();
-  const sent = await emailReply({
-    db,
-    mailer,
-    ticketId,
-    fromName: AI_SENDER_NAME,
-    bodyText: reply,
-  });
+  const sent = await emailReply(ticketId, AI_SENDER_NAME, reply);
 
-  // The email is out, so a failure from here on must not make the job retry and email it again.
+  // The email is out, so a failure from here on must not retry the job and email it again.
   try {
-    await db.ticket.update({
+    await prisma.ticket.update({
       where: { id: ticketId },
       data: {
         status: 'resolved',
@@ -121,19 +105,15 @@ ${formatConversation(ticket)}
   } catch (error) {
     console.error(`Ticket ${ticketId} was answered by email but could not be saved`, error);
   }
+  console.log(`Auto-resolved ticket ${ticketId}`);
   return 'resolved';
 }
 
 /** Open, unassigned, and holding only the student's first email. */
-async function isUntouched(db: Database, ticketId: number) {
-  const ticket = await db.ticket.findUnique({
+async function isUntouched(ticketId: number) {
+  const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
     select: { status: true, assigneeId: true, _count: { select: { messages: true } } },
   });
-  return (
-    ticket !== null &&
-    ticket.status === 'open' &&
-    ticket.assigneeId === null &&
-    ticket._count.messages === 1
-  );
+  return ticket?.status === 'open' && ticket.assigneeId === null && ticket._count.messages === 1;
 }

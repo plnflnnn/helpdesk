@@ -1,10 +1,9 @@
-import { generateText, Output, type LanguageModel } from 'ai';
+import { generateText, Output } from 'ai';
 import { z } from 'zod';
 import { ticketCategorySchema, ticketPrioritySchema } from '@helpdesk/shared';
-import type { Database } from '@/db.js';
-import { HttpError } from '@/errors.js';
-import { formatConversation } from '@/services/ai.js';
-import { getTicket } from '@/services/tickets.js';
+import prisma from '@/db.js';
+import { aiModel, formatConversation } from '@/lib/ai.js';
+import { findTicket } from '@/lib/tickets.js';
 
 const INSTRUCTIONS = `You triage support tickets for an online course platform.
 Read the ticket and choose exactly one category and one priority.
@@ -27,51 +26,30 @@ const classificationSchema = z.object({
   priority: ticketPrioritySchema,
 });
 
-export type Classification = z.infer<typeof classificationSchema>;
-
-type ClassifyTicketParams = {
-  db: Database;
-  model: LanguageModel;
-  ticketId: number;
-  /** Aborts the AI call, e.g. when the job times out. */
-  signal?: AbortSignal;
-};
-
 /**
- * Asks the AI for the ticket's category and priority and saves them, unless an agent changed either
- * while the AI was running (the agent's choice wins). Refund requests are always high priority.
- *
- * Does nothing for a ticket that no longer exists. Throws when the AI fails, so the job is retried.
+ * Saves the AI's category and priority for the ticket, unless an agent changed either meanwhile.
+ * Refund requests are always high priority. Throws when the AI fails, so the job is retried.
  */
-export async function classifyTicket({ db, model, ticketId, signal }: ClassifyTicketParams) {
-  let ticket;
-  try {
-    ticket = await getTicket(db, ticketId);
-  } catch (error) {
-    if (error instanceof HttpError && error.status === 404) {
-      return;
-    }
-    throw error;
+export async function classifyTicket(ticketId: number, signal?: AbortSignal) {
+  const model = aiModel();
+  const ticket = await findTicket(ticketId);
+  if (!model || !ticket) {
+    return;
   }
 
   const { output } = await generateText({
     model,
     instructions: INSTRUCTIONS,
-    prompt: `Subject: ${ticket.subject}
-
-<conversation>
-${formatConversation(ticket)}
-</conversation>`,
+    prompt: `Subject: ${ticket.subject}\n\n<conversation>\n${formatConversation(ticket)}\n</conversation>`,
     output: Output.object({ schema: classificationSchema }),
-    maxRetries: 0, // pg-boss retries the whole job.
+    maxRetries: 0, // The queue retries the whole job.
     timeout: 30_000,
     abortSignal: signal,
   });
   const { category } = output;
   const priority = category === 'refund_request' ? 'high' : output.priority;
 
-  // Only overwrite the category and priority if they are still what they were before the AI ran.
-  await db.ticket.updateMany({
+  await prisma.ticket.updateMany({
     where: { id: ticketId, category: ticket.category, priority: ticket.priority },
     data: { category, priority },
   });

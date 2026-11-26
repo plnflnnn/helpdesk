@@ -1,10 +1,14 @@
 import { jest } from '@jest/globals';
-import type { JobQueue } from '@/jobs/queue.js';
-import { createTestContext, INBOUND_EMAIL_SECRET } from '@/test/context.js';
 
-const classifyTicket = jest.fn<JobQueue['classifyTicket']>();
-const autoResolveTicket = jest.fn<JobQueue['autoResolveTicket']>();
-const ctx = createTestContext({ jobs: { classifyTicket, autoResolveTicket } });
+const classifyTicket = jest.fn<(ticketId: number) => Promise<void>>();
+const autoResolveTicket = jest.fn<(ticketId: number) => Promise<void>>();
+jest.unstable_mockModule('@/lib/queue.js', () => ({
+  sendClassifyJob: classifyTicket,
+  sendAutoResolveJob: autoResolveTicket,
+}));
+const { createTestContext, INBOUND_EMAIL_SECRET } = await import('@/test/context.js');
+
+const ctx = createTestContext();
 
 beforeEach(async () => {
   classifyTicket.mockReset();

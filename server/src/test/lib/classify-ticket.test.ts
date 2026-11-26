@@ -1,22 +1,9 @@
-import { jest } from '@jest/globals';
-import { MockLanguageModelV4 } from 'ai/test';
-import { classifyTicket, type Classification } from '@/services/ticket-classification.js';
-import { createTestContext } from '@/test/context.js';
+import { doGenerate, mockAi, modelReply } from '@/test/mock-ai.js';
 
-type GenerateResult = Awaited<ReturnType<MockLanguageModelV4['doGenerate']>>;
+mockAi();
+const { classifyTicket } = await import('@/lib/classify-ticket.js');
+const { createTestContext } = await import('@/test/context.js');
 
-const modelReply = (classification: Classification): GenerateResult => ({
-  content: [{ type: 'text', text: JSON.stringify(classification) }],
-  finishReason: { unified: 'stop', raw: 'stop' },
-  usage: {
-    inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
-    outputTokens: { total: 5, text: 5, reasoning: 0 },
-  },
-  warnings: [],
-});
-
-const doGenerate = jest.fn<MockLanguageModelV4['doGenerate']>();
-const model = new MockLanguageModelV4({ doGenerate });
 const ctx = createTestContext();
 
 beforeEach(async () => {
@@ -35,12 +22,14 @@ async function createTicket() {
   });
 }
 
-const classify = (ticketId: number) => classifyTicket({ db: ctx.db, model, ticketId });
+const classify = (ticketId: number) => classifyTicket(ticketId);
 
 describe('classifyTicket', () => {
   it('sets the category and priority', async () => {
     const { id } = await createTicket();
-    doGenerate.mockResolvedValue(modelReply({ category: 'technical_question', priority: 'high' }));
+    doGenerate.mockResolvedValue(
+      modelReply(JSON.stringify({ category: 'technical_question', priority: 'high' })),
+    );
 
     await classify(id);
 
@@ -54,7 +43,9 @@ describe('classifyTicket', () => {
 
   it('makes refund requests high priority', async () => {
     const { id } = await createTicket();
-    doGenerate.mockResolvedValue(modelReply({ category: 'refund_request', priority: 'low' }));
+    doGenerate.mockResolvedValue(
+      modelReply(JSON.stringify({ category: 'refund_request', priority: 'low' })),
+    );
 
     await classify(id);
 
@@ -67,7 +58,7 @@ describe('classifyTicket', () => {
     const { id } = await createTicket();
     doGenerate.mockImplementation(async () => {
       await ctx.db.ticket.update({ where: { id }, data: { category: 'general_question' } });
-      return modelReply({ category: 'technical_question', priority: 'high' });
+      return modelReply(JSON.stringify({ category: 'technical_question', priority: 'high' }));
     });
 
     await classify(id);

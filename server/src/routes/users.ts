@@ -1,66 +1,113 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import {
-  createUserInputSchema,
-  Role,
-  updateUserInputSchema,
-  type ListUsersResponse,
-  type UpdateUserInput,
-  type User,
-  type UserResponse,
-} from '@helpdesk/shared';
-import { badRequest } from '@/errors.js';
-import { requireAuth, requireRole } from '@/middleware/auth.js';
-import { validate } from '@/middleware/validate.js';
-import { createUser, deleteUser, listUsers, updateUser } from '@/services/users.js';
-import type { Services } from '@/types.js';
+import { hashPassword } from 'better-auth/crypto';
+import { createUserInputSchema, Role, updateUserInputSchema } from '@helpdesk/shared';
+import prisma from '@/db.js';
+import { createUser, userSelect } from '@/lib/create-user.js';
+import { validate } from '@/lib/validate.js';
+import { requireAdmin } from '@/middleware/require-admin.js';
+import { requireAuth } from '@/middleware/require-auth.js';
 
-const userIdParamsSchema = z.object({ id: z.string().min(1) });
+const userIdSchema = z.string().min(1);
 
-/** Admin-only user management: list, create, update and (soft) delete users. */
-export function usersRouter({ db, auth }: Services) {
-  const router = Router();
-  router.use(requireAuth(auth), requireRole(Role.admin));
+const router = Router();
+router.use(requireAuth, requireAdmin);
 
-  router.get('/', async (_req, res) => {
-    const body: ListUsersResponse = { users: await listUsers(db) };
-    res.json(body);
+router.get('/', async (_req, res) => {
+  const users = await prisma.user.findMany({
+    where: { deletedAt: null },
+    select: userSelect,
+    orderBy: [{ active: 'desc' }, { name: 'asc' }],
   });
+  res.json({ users });
+});
 
-  router.post('/', validate({ body: createUserInputSchema }), async (req, res) => {
-    const body: UserResponse = { user: await createUser({ db, data: req.body }) };
-    res.status(201).json(body);
-  });
+router.post('/', async (req, res) => {
+  const data = validate(createUserInputSchema, req.body, res);
+  if (!data) return;
 
-  router.patch(
-    '/:id',
-    validate({ params: userIdParamsSchema, body: updateUserInputSchema }),
-    async (req, res) => {
-      const userId = req.params.id;
-      assertNotLockingSelfOut(req.user!, userId, req.body);
-
-      const body: UserResponse = { user: await updateUser({ db, userId, data: req.body }) };
-      res.json(body);
-    },
-  );
-
-  router.delete('/:id', validate({ params: userIdParamsSchema }), async (req, res) => {
-    await deleteUser({ db, userId: req.params.id });
-    res.status(204).end();
-  });
-
-  return router;
-}
-
-/** Admins can't deactivate or demote themselves, so there is always an admin who can sign in. */
-function assertNotLockingSelfOut(currentUser: User, userId: string, data: UpdateUserInput) {
-  if (userId !== currentUser.id) {
+  if (await isEmailTaken(data.email)) {
+    res.status(409).json({ error: 'A user with this email already exists' });
     return;
   }
-  if (data.active === false) {
-    throw badRequest('You cannot deactivate your own account');
+
+  res.status(201).json({ user: await createUser(data) });
+});
+
+/** A new password or deactivation signs the user out; deactivation also unassigns their tickets. */
+router.patch('/:id', async (req, res) => {
+  const id = validate(userIdSchema, req.params.id, res);
+  if (!id) return;
+  const data = validate(updateUserInputSchema, req.body, res);
+  if (!data) return;
+
+  // So there is always an admin who can sign in.
+  if (id === req.user.id && data.active === false) {
+    res.status(400).json({ error: 'You cannot deactivate your own account' });
+    return;
   }
-  if (data.role !== undefined && data.role !== currentUser.role) {
-    throw badRequest('You cannot change your own role');
+  if (id === req.user.id && data.role !== undefined && data.role !== req.user.role) {
+    res.status(400).json({ error: 'You cannot change your own role' });
+    return;
   }
+
+  if (!(await prisma.user.findFirst({ where: { id, deletedAt: null } }))) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  if (data.email && (await isEmailTaken(data.email, id))) {
+    res.status(409).json({ error: 'A user with this email already exists' });
+    return;
+  }
+
+  const { password, ...fields } = data;
+  const passwordHash = password ? await hashPassword(password) : undefined;
+  const deactivate = data.active === false;
+
+  const user = await prisma.$transaction(async (tx) => {
+    if (passwordHash) {
+      await tx.account.updateMany({ where: { userId: id }, data: { password: passwordHash } });
+    }
+    if (passwordHash || deactivate) {
+      await tx.session.deleteMany({ where: { userId: id } });
+    }
+    if (deactivate) {
+      await tx.ticket.updateMany({ where: { assigneeId: id }, data: { assigneeId: null } });
+    }
+    return tx.user.update({ where: { id }, data: fields, select: userSelect });
+  });
+  res.json({ user });
+});
+
+/**
+ * Soft-deletes an agent: they can't sign in, their sessions end and their tickets are unassigned.
+ * The row stays, so their messages keep their author.
+ */
+router.delete('/:id', async (req, res) => {
+  const id = validate(userIdSchema, req.params.id, res);
+  if (!id) return;
+
+  const user = await prisma.user.findFirst({ where: { id, deletedAt: null } });
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  if (user.role === Role.admin) {
+    res.status(403).json({ error: 'Admins cannot be deleted' });
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.session.deleteMany({ where: { userId: id } }),
+    prisma.ticket.updateMany({ where: { assigneeId: id }, data: { assigneeId: null } }),
+    prisma.user.update({ where: { id }, data: { deletedAt: new Date(), active: false } }),
+  ]);
+  res.status(204).end();
+});
+
+async function isEmailTaken(email: string, exceptUserId?: string) {
+  const owner = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  return owner !== null && owner.id !== exceptUserId;
 }
+
+export default router;

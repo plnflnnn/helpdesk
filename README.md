@@ -17,7 +17,7 @@ An AI-powered support ticket system for an online course platform. Student email
 - Node.js 24 + Express 5 + TypeScript
 - PostgreSQL 17 + Prisma 7 (ORM and migrations)
 - Better Auth (database sessions, admin/agent roles)
-- pg-boss (Postgres-backed background job queue, run by a separate worker process)
+- pg-boss (Postgres-backed background job queue, run inside the API server)
 - Vercel AI SDK + OpenAI (classification, summaries, auto-replies, reply polishing)
 - SendGrid (Inbound Parse webhook for incoming email, Mail Send for replies)
 - Multer (email attachments)
@@ -25,7 +25,7 @@ An AI-powered support ticket system for an online course platform. Student email
 **Shared and tooling**
 
 - Zod schemas shared by client and server (npm workspaces)
-- Sentry error reporting (server, worker and client)
+- Sentry error reporting (server and client)
 - Jest, React Testing Library, Supertest, Playwright
 - ESLint, Prettier
 
@@ -94,10 +94,9 @@ Without `SENDGRID_API_KEY`, outgoing emails are printed to the server console in
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Client on http://localhost:3000, API on http://localhost:4000 (client proxies `/api`), and the job worker |
+| `npm run dev` | Client on http://localhost:3000, API on http://localhost:4000 (client proxies `/api`); the API server also runs the background jobs |
 | `npm run build` | Build shared, server, and client |
 | `npm start` | Run the built server (serves the built client when `NODE_ENV=production`) |
-| `npm run start:worker` | Run the built background job worker |
 | `npm test` | Jest tests for server and client (server tests use `TEST_DATABASE_URL`, wiped between tests) |
 | `npm run test:e2e` | Playwright end-to-end tests (starts dev servers automatically) |
 | `npm run typecheck` | TypeScript checks for all packages |
@@ -111,10 +110,9 @@ Without `SENDGRID_API_KEY`, outgoing emails are printed to the server console in
 
 ## Deploy to Render
 
-[render.yaml](render.yaml) is a Render Blueprint that creates three resources:
+[render.yaml](render.yaml) is a Render Blueprint that creates two resources:
 
-- **helpdesk**: a web service that runs the API and serves the built React app. Before each deploy it applies migrations (`npm run db:deploy`) and creates the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` (no demo data in production).
-- **helpdesk-worker**: a background worker that runs the pg-boss jobs (AI classification and auto-resolve).
+- **helpdesk**: a web service that runs the API, the pg-boss jobs (AI classification and auto-resolve) and serves the built React app. Before each deploy it applies migrations (`npm run db:deploy`) and creates the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` (no demo data in production).
 - **helpdesk-db**: PostgreSQL 17. Render supports pgvector.
 
 Steps:
@@ -122,17 +120,14 @@ Steps:
 1. Push the repo to GitHub or GitLab. In Render, choose **New → Blueprint** and select the repo.
 2. Fill in the values Render asks for:
    - Required: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`.
-   - On the worker, `APP_URL`: the web service URL, e.g. `https://helpdesk.onrender.com`.
    - Optional: `OPENAI_API_KEY`, `SENDGRID_INBOUND_SECRET` (`openssl rand -hex 24`), and the Sentry DSNs.
 3. Point SendGrid Inbound Parse at `https://<your-host>/webhooks/inbound?secret=<SENDGRID_INBOUND_SECRET>`.
 
-To skip the separate worker (Render background workers have no free plan), set `RUN_WORKER=true` and `OPENAI_API_KEY` on the web service: it then runs the jobs itself. Delete the worker service so that only one process consumes the queue (two would also work, but cost more).
-
-On the web service, `APP_URL` and `BETTER_AUTH_URL` default to its `onrender.com` URL. If you add a custom domain, set `APP_URL` on both services. `BETTER_AUTH_SECRET` is generated once and shared through the `helpdesk-shared` environment group.
+`APP_URL` and `BETTER_AUTH_URL` default to the service's `onrender.com` URL. If you add a custom domain, set `APP_URL`.
 
 ## Deploy to Vercel
 
-On Vercel the API runs as one serverless function (`api/index.js` → `server/src/vercel.ts`), and Vercel's CDN serves the React app (`vercel.json`). There is no long-running worker, so the ticket jobs (AI classification and auto-resolve) run right after the response through `waitUntil`, retrying twice, instead of through pg-boss. A job that still fails leaves the ticket for agents.
+On Vercel the API runs as one serverless function (`api/index.js` → `server/src/app.ts`), and Vercel's CDN serves the React app (`vercel.json`). There is no long-running worker, so the ticket jobs (AI classification and auto-resolve) run right after the response through `waitUntil`, retrying twice, instead of through pg-boss. A job that still fails leaves the ticket for agents.
 
 1. In Vercel, import the repo (keep the root directory, settings come from `vercel.json`).
 2. Under **Storage**, create a **Neon** Postgres database or connect an existing one. This sets `DATABASE_URL` (pooled, used by the app) and `DATABASE_URL_UNPOOLED` (direct, used by migrations). If you set them by hand, take the direct URL from Neon with connection pooling turned off.
@@ -146,7 +141,7 @@ On Vercel the API runs as one serverless function (`api/index.js` → `server/sr
 
 ```
 client/   React app (webpack, Tailwind CSS, shadcn/ui)
-server/   Express API, job worker, Prisma schema and migrations, knowledge base
+server/   Express API and background jobs, Prisma schema and migrations, knowledge base
 shared/   Zod schemas and types used by client and server
 e2e/      Playwright tests
 ```

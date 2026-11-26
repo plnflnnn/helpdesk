@@ -1,17 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import type { LanguageModel } from 'ai';
 import { hashPassword } from 'better-auth/crypto';
 import { Role } from '@helpdesk/shared';
-import { createApp } from '@/app.js';
-import { createAuth } from '@/auth.js';
-import { createPrismaClient } from '@/db.js';
-import type { JobQueue } from '@/jobs/queue.js';
-import type { Mailer } from '@/services/email.js';
-import { testDatabaseUrl } from '@/test/database-url.js';
+import { app } from '@/app.js';
+import db from '@/db.js';
 
-export const APP_URL = 'http://localhost:3000';
+export const APP_URL = process.env.APP_URL!;
 export const PASSWORD = 'correct-horse-battery';
+export const INBOUND_EMAIL_SECRET = process.env.SENDGRID_INBOUND_SECRET!;
 
 type CreateTestUserOptions = {
   role?: Role;
@@ -19,35 +15,11 @@ type CreateTestUserOptions = {
   email?: string;
 };
 
-type TestContextOptions = {
-  /** Model for AI features; use a `MockLanguageModelV4` from `ai/test`. */
-  aiModel?: LanguageModel;
-  /** Defaults to one that accepts every email and sends nothing. */
-  mailer?: Mailer;
-  /** Defaults to one that accepts every job and runs nothing. */
-  jobs?: JobQueue;
-};
-
-export const INBOUND_EMAIL_SECRET = 'test-inbound-secret-0123456789';
-
-/** A real app wired to the test database. Call `reset()` before each test and `close()` after all. */
-export function createTestContext({
-  aiModel,
-  mailer = { from: 'support@example.com', send: async () => {} },
-  jobs = { classifyTicket: async () => {}, autoResolveTicket: async () => {} },
-}: TestContextOptions = {}) {
-  const db = createPrismaClient(testDatabaseUrl());
-  const auth = createAuth(db, {
-    NODE_ENV: 'test',
-    BETTER_AUTH_SECRET: 'test-secret-that-is-at-least-32-characters-long',
-    BETTER_AUTH_URL: 'http://localhost:4000',
-    APP_URL,
-  });
-  const app = createApp({
-    checkDatabase: async () => true,
-    services: { db, auth, aiModel, mailer, jobs, inboundEmailSecret: INBOUND_EMAIL_SECRET },
-  });
-
+/**
+ * The app on the test database (see setup-env.ts). Call `reset()` before each test and `close()`
+ * after all. In a test file that mocks modules, import this after `jest.unstable_mockModule`.
+ */
+export function createTestContext() {
   async function reset() {
     await db.$executeRaw`TRUNCATE TABLE "users", "sessions", "accounts", "verifications", "students", "tickets", "messages" RESTART IDENTITY CASCADE`;
   }
@@ -66,11 +38,7 @@ export function createTestContext({
         role,
         active,
         accounts: {
-          create: {
-            id: randomUUID(),
-            accountId: id,
-            password: await hashPassword(PASSWORD),
-          },
+          create: { id: randomUUID(), accountId: id, password: await hashPassword(PASSWORD) },
         },
       },
     });
