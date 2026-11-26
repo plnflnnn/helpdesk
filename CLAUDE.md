@@ -13,7 +13,7 @@ Keep the server flat and simple: no service layer, no dependency injection, no c
 ```
 src/
   app.ts       Express app: mounts every router, health check, error handler
-  index.ts     Long-running entry (local/Render): startQueue() + app.listen()
+  index.ts     Long-running entry for local development: startQueue() + app.listen()
   db.ts        `export default prisma` (singleton)
   env.ts       Loads .env; import it first in modules that read env at load time
   lib/         Shared logic: auth, queue + jobs, email, AI, validate, parse-id, sentry

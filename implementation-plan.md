@@ -248,7 +248,7 @@ Each phase ends with something that works end to end. Tasks are small enough to 
 ### Deployment
 - [ ] Production Dockerfile (multi-stage build)
 - [ ] Optional Docker Compose for local development (Postgres + pgvector), replacing the Homebrew setup
-- [ ] Deploy to Railway or Render: managed Postgres with pgvector, web service, worker service
+- [x] Deploy to Vercel with Neon Postgres
 - [ ] Configure production environment variables and secrets
 - [ ] Point SendGrid Inbound Parse at the production webhook
 - [ ] Run migrations and seed the first admin in production

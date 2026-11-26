@@ -24,7 +24,7 @@ Runtime versions: Node.js 24 LTS, TypeScript 6.0 (typescript-eslint and ts-jest 
 | AI                    | Claude API                         | Haiku 5.5 for classification and summaries; Sonnet 5.5 for reply drafts                             |
 | File storage          | S3 or Cloudflare R2                | Email attachments                                                                                   |
 | Testing               | Jest + React Testing Library + Playwright | Unit/API/component tests and end-to-end tests                                                |
-| Deployment            | Docker on Railway or Render        | Managed Postgres, web service, worker process                                                       |
+| Deployment            | Vercel + Neon Postgres             | Serverless API function, static React app on the CDN, background jobs run via `waitUntil`           |
 
 ## Authentication
 

@@ -17,7 +17,7 @@ An AI-powered support ticket system for an online course platform. Student email
 - Node.js 24 + Express 5 + TypeScript
 - PostgreSQL 17 + Prisma 7 (ORM and migrations)
 - Better Auth (database sessions, admin/agent roles)
-- pg-boss (Postgres-backed background job queue, run inside the API server)
+- pg-boss (Postgres-backed background job queue for local development; on Vercel, jobs run through `waitUntil`)
 - Vercel AI SDK + OpenAI (classification, summaries, auto-replies, reply polishing)
 - SendGrid (Inbound Parse webhook for incoming email, Mail Send for replies)
 - Multer (parses the Inbound Parse form; attachments are not stored)
@@ -107,23 +107,6 @@ Without `SENDGRID_API_KEY`, outgoing emails are printed to the server console in
 | `npm run db:generate` | Regenerate the Prisma client |
 | `npm run db:seed` | Create the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD`, plus demo agents and tickets outside production (safe to re-run) |
 | `npm run db:seed:replies` | Add demo conversations to resolved tickets (safe to re-run) |
-
-## Deploy to Render
-
-[render.yaml](render.yaml) is a Render Blueprint that creates two resources:
-
-- **helpdesk**: a web service that runs the API, the pg-boss jobs (AI classification and auto-resolve) and serves the built React app. Before each deploy it applies migrations (`npm run db:deploy`) and creates the admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` (no demo data in production).
-- **helpdesk-db**: PostgreSQL 17. Render supports pgvector.
-
-Steps:
-
-1. Push the repo to GitHub or GitLab. In Render, choose **New → Blueprint** and select the repo.
-2. Fill in the values Render asks for:
-   - Required: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`.
-   - Optional: `OPENAI_API_KEY`, `SENDGRID_INBOUND_SECRET` (`openssl rand -hex 24`), and the Sentry DSNs.
-3. Point SendGrid Inbound Parse at `https://<your-host>/webhooks/inbound?secret=<SENDGRID_INBOUND_SECRET>`.
-
-`APP_URL` and `BETTER_AUTH_URL` default to the service's `onrender.com` URL. If you add a custom domain, set `APP_URL`.
 
 ## Deploy to Vercel
 

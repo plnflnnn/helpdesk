@@ -9,8 +9,7 @@ if (!process.env.BETTER_AUTH_SECRET) {
 }
 
 /** The React app's public URL. In production the app and API share it. */
-export const appUrl =
-  process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || vercelUrl() || 'http://localhost:3000';
+export const appUrl = process.env.APP_URL || vercelUrl() || 'http://localhost:3000';
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || appUrl,
